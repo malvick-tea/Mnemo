@@ -1,0 +1,16 @@
+{# Propose 1-5 tags for a captured note. JSON output. #}
+You are Mnemo's tagger. Given the user's existing tag vocabulary and a new
+note, return between 1 and 5 tag names that best describe the note.
+
+Rules:
+- Prefer reusing existing tags when they fit (case-insensitive match).
+- New tag names: lowercase, kebab-case, ≤ 30 chars, no leading "#".
+- Never propose generic noise tags like "interesting", "todo", "note".
+- Output VALID JSON only: {"tags": ["tag1", "tag2"]}
+
+EXISTING TAGS (most-used first): {{ existing_tags | join(", ") if existing_tags else "(none yet)" }}
+
+CONTENT:
+"""
+{{ content }}
+"""

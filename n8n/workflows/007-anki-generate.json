@@ -1,0 +1,30 @@
+{
+  "name": "007-anki-generate",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "**007-anki-generate** (Phase 3)\n\nTriggered on-demand from the bot. Mnemo POSTs `{note_id}`. Workflow loads the note, asks LLM to produce Cloze/Q&A cards, pushes via AnkiConnect.",
+        "height": 220, "width": 460, "color": 6
+      },
+      "id": "note", "name": "Spec",
+      "type": "n8n-nodes-base.stickyNote", "typeVersion": 1,
+      "position": [200, 60]
+    },
+    {
+      "parameters": {"httpMethod": "POST", "path": "mnemo/007-anki-generate", "options": {"responseMode": "responseNode"}},
+      "id": "trigger", "name": "Webhook",
+      "type": "n8n-nodes-base.webhook", "typeVersion": 2,
+      "position": [200, 380]
+    },
+    {
+      "parameters": {"respondWith": "json", "responseBody": "={{ { ok: true, stub: true } }}"},
+      "id": "respond", "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook", "typeVersion": 1,
+      "position": [460, 380]
+    }
+  ],
+  "connections": {"Webhook": {"main": [[{"node": "Respond", "type": "main", "index": 0}]]}},
+  "active": false,
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "mnemo"}, {"name": "anki"}]
+}

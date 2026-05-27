@@ -1,0 +1,47 @@
+{
+  "name": "002-voice-transcribe",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "**002-voice-transcribe** (milestone-2 stub)\n\nTrigger: Mnemo API POSTs `{note_id, blob_key}`.\nFlow: HMAC verify → MinIO download → faster-whisper transcribe → optional diarization (pyannote) → summarize → tag → embed → callback Mnemo.\nFor v1 a Dramatiq worker handles voice locally. This workflow is left as a stub.",
+        "height": 300,
+        "width": 460,
+        "color": 3
+      },
+      "id": "note",
+      "name": "Spec",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [200, 60]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mnemo/002-voice-transcribe",
+        "options": {"responseMode": "responseNode"}
+      },
+      "id": "trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, stub: true, note: '002 workflow is a milestone-2 placeholder' } }}"
+      },
+      "id": "respond",
+      "name": "Respond stub",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [460, 400]
+    }
+  ],
+  "connections": {
+    "Webhook": {"main": [[{"node": "Respond stub", "type": "main", "index": 0}]]}
+  },
+  "active": false,
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "mnemo"}, {"name": "stub"}]
+}

@@ -1,0 +1,32 @@
+# Mnemo Caddyfile. bootstrap.sh copies this to ./Caddyfile and substitutes
+# {$MNEMO_DOMAIN}. For local dev replace with "localhost" and add a
+# `tls internal` directive (Caddy will mint a self-signed cert).
+
+{$MNEMO_DOMAIN} {
+    encode gzip zstd
+
+    # ── Telegram webhook ────────────────────────────────────────────────────
+    # The path is a per-install secret (TELEGRAM_WEBHOOK_PATH). Anything that
+    # doesn't match the secret prefix is rejected before reaching the bot.
+    handle_path {$TELEGRAM_WEBHOOK_PATH}* {
+        reverse_proxy bot:8080 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+        }
+    }
+
+    # ── n8n editor & webhooks ───────────────────────────────────────────────
+    handle_path /n8n/* {
+        basicauth {
+            {$N8N_BASIC_AUTH_USER} {$N8N_BASIC_AUTH_PASSWORD_HASH}
+        }
+        reverse_proxy n8n:5678 {
+            header_up Host {host}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
+    # Everything else: return 404. Mnemo's Core API is intentionally NOT
+    # exposed to the internet.
+    respond 404
+}

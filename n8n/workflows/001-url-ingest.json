@@ -1,0 +1,125 @@
+{
+  "name": "001-url-ingest",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mnemo/001-url-ingest",
+        "options": {"responseMode": "responseNode"}
+      },
+      "id": "trigger",
+      "name": "Webhook (mnemo/001-url-ingest)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "content": "**001-url-ingest**\n\nTrigger: Mnemo API POSTs `{note_id, url}`.\nFlow: HMAC verify → fetch URL → trafilatura/Readability → summarize (LLM) → tag (LLM) → callback Mnemo with processed_content/summary/tags.\nFailure modes: trafilatura returns empty (Playwright fallback in milestone-2), upstream LLM 5xx (retried 3x).",
+        "height": 220,
+        "width": 360,
+        "color": 5
+      },
+      "id": "note",
+      "name": "Spec",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [200, 60]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Verify the HMAC signature: SHA-256(secret, `${ts}.${body}`)\nconst body = JSON.stringify(items[0].json);\nconst sig = $request.headers['x-mnemo-signature'];\nconst ts  = $request.headers['x-mnemo-timestamp'];\nconst now = Math.floor(Date.now() / 1000);\nif (!sig || !ts || Math.abs(now - parseInt(ts, 10)) > 300) {\n  throw new Error('Signature missing or timestamp outside replay window');\n}\nconst crypto = require('crypto');\nconst secret = $env.MNEMO_WEBHOOK_HMAC_SECRET;\nconst expected = crypto.createHmac('sha256', secret).update(`${ts}.${body}`).digest('hex');\nif (expected !== sig) { throw new Error('HMAC mismatch'); }\nreturn items;"
+      },
+      "id": "verify_hmac",
+      "name": "Verify HMAC",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$json[\"url\"]}}",
+        "options": {
+          "timeout": 15000,
+          "redirect": {"redirect": {"followRedirects": true, "maxRedirects": 5}}
+        }
+      },
+      "id": "fetch",
+      "name": "Fetch URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [700, 300],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "parameters": {
+        "functionCode": "// Minimal Readability-style extraction. Workflow can be replaced with a\n// trafilatura HTTP service in compose for higher fidelity.\nconst html = String(items[0].json.body || '');\nconst stripped = html\n  .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n  .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n  .replace(/<[^>]+>/g, ' ')\n  .replace(/&nbsp;/g, ' ')\n  .replace(/\\s+/g, ' ')\n  .trim();\nconst title = (html.match(/<title>([^<]+)<\\/title>/i) || [])[1] || '';\nreturn [{ json: { title, processed_content: stripped.slice(0, 60000), note_id: $node['Webhook (mnemo/001-url-ingest)'].json.note_id } }];"
+      },
+      "id": "extract",
+      "name": "Readability extract",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [940, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Sign and forward the result back to the Mnemo API.\nconst body = JSON.stringify({\n  note_id: items[0].json.note_id,\n  title: items[0].json.title,\n  processed_content: items[0].json.processed_content,\n  extracted_metadata: { extracted_by: '001-url-ingest' },\n});\nconst ts = String(Math.floor(Date.now() / 1000));\nconst crypto = require('crypto');\nconst secret = $env.MNEMO_WEBHOOK_HMAC_SECRET;\nconst sig = crypto.createHmac('sha256', secret).update(`${ts}.${body}`).digest('hex');\nreturn [{ json: { body, ts, sig, idem: `001:${items[0].json.note_id}:${ts.slice(0,8)}` } }];"
+      },
+      "id": "sign_callback",
+      "name": "Sign callback",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1180, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.MNEMO_API_BASE_URL}}/v1/webhooks/n8n/note-ready",
+        "sendBody": true,
+        "specifyBody": "raw",
+        "rawBody": "={{$json[\"body\"]}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type", "value": "application/json"},
+            {"name": "X-Mnemo-Signature", "value": "={{$json[\"sig\"]}}"},
+            {"name": "X-Mnemo-Timestamp", "value": "={{$json[\"ts\"]}}"},
+            {"name": "Idempotency-Key", "value": "={{$json[\"idem\"]}}"}
+          ]
+        }
+      },
+      "id": "callback",
+      "name": "Callback Mnemo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1420, 300],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true } }}"
+      },
+      "id": "respond",
+      "name": "Respond 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1660, 300]
+    }
+  ],
+  "connections": {
+    "Webhook (mnemo/001-url-ingest)": {"main": [[{"node": "Verify HMAC", "type": "main", "index": 0}]]},
+    "Verify HMAC": {"main": [[{"node": "Fetch URL", "type": "main", "index": 0}]]},
+    "Fetch URL": {"main": [[{"node": "Readability extract", "type": "main", "index": 0}]]},
+    "Readability extract": {"main": [[{"node": "Sign callback", "type": "main", "index": 0}]]},
+    "Sign callback": {"main": [[{"node": "Callback Mnemo", "type": "main", "index": 0}]]},
+    "Callback Mnemo": {"main": [[{"node": "Respond 200", "type": "main", "index": 0}]]}
+  },
+  "active": true,
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "mnemo"}, {"name": "ingest"}]
+}

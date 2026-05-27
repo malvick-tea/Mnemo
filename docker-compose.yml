@@ -1,0 +1,225 @@
+# Mnemo — production-grade compose.
+# For development, layer docker-compose.dev.yml on top:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-restart: &default-restart
+  restart: unless-stopped
+
+networks:
+  web:       # public-ish — only caddy is reachable from the host
+    name: mnemo_web
+  internal:  # databases & workers
+    name: mnemo_internal
+    internal: true
+
+volumes:
+  postgres_data:
+  qdrant_data:
+  redis_data:
+  minio_data:
+  n8n_data:
+  caddy_data:
+  caddy_config:
+
+services:
+  # ─── Reverse proxy & TLS ───────────────────────────────────────────────────
+  caddy:
+    image: caddy:2.8-alpine
+    <<: *default-restart
+    logging: *default-logging
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      MNEMO_DOMAIN: ${MNEMO_DOMAIN}
+      N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER}
+      # Caddy reads the bcrypt hash from .env; bootstrap.sh generates it.
+      N8N_BASIC_AUTH_PASSWORD_HASH: ${N8N_BASIC_AUTH_PASSWORD_HASH:-}
+    networks: [web]
+    depends_on:
+      - bot
+      - n8n
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ─── Telegram bot ──────────────────────────────────────────────────────────
+  bot:
+    build:
+      context: ./services/bot
+      dockerfile: Dockerfile
+    image: mnemo/bot:latest
+    <<: *default-restart
+    logging: *default-logging
+    env_file: .env
+    environment:
+      MNEMO_API_BASE_URL: http://api:8000
+    networks: [web, internal]
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "python", "-m", "mnemo_bot.healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ─── Core API ──────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    image: mnemo/api:latest
+    <<: *default-restart
+    logging: *default-logging
+    env_file: .env
+    networks: [internal]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/v1/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ─── Dramatiq workers ──────────────────────────────────────────────────────
+  workers:
+    build:
+      context: ./services/workers
+      dockerfile: Dockerfile
+    image: mnemo/workers:latest
+    <<: *default-restart
+    logging: *default-logging
+    env_file: .env
+    networks: [internal]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    mem_limit: 2g
+    healthcheck:
+      test: ["CMD", "python", "-m", "mnemo_workers.healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── Postgres ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    <<: *default-restart
+    logging: *default-logging
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./services/api/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Qdrant ────────────────────────────────────────────────────────────────
+  qdrant:
+    image: qdrant/qdrant:v1.11.0
+    <<: *default-restart
+    logging: *default-logging
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks: [internal]
+    environment:
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:-}
+      QDRANT__LOG_LEVEL: INFO
+
+  # ─── Redis ─────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    <<: *default-restart
+    logging: *default-logging
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb",
+              "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── MinIO (S3-compatible object store) ────────────────────────────────────
+  minio:
+    image: minio/minio:RELEASE.2025-01-20T14-49-07Z
+    <<: *default-restart
+    logging: *default-logging
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    volumes:
+      - minio_data:/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ─── n8n ───────────────────────────────────────────────────────────────────
+  n8n:
+    image: n8nio/n8n:1.78.0
+    <<: *default-restart
+    logging: *default-logging
+    environment:
+      N8N_HOST: ${MNEMO_DOMAIN}
+      N8N_PORT: 5678
+      N8N_PROTOCOL: https
+      N8N_EDITOR_BASE_URL: https://${MNEMO_DOMAIN}/n8n/
+      WEBHOOK_URL: https://${MNEMO_DOMAIN}/n8n/
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD}
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      EXECUTIONS_DATA_PRUNE: "true"
+      EXECUTIONS_DATA_MAX_AGE: 168          # hours = 7 days
+      # Workflows expect Mnemo API in env so they can call back.
+      MNEMO_API_BASE_URL: http://api:8000
+      MNEMO_WEBHOOK_HMAC_SECRET: ${MNEMO_WEBHOOK_HMAC_SECRET}
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n/workflows:/workflows:ro
+    networks: [web, internal]
+    depends_on:
+      - api

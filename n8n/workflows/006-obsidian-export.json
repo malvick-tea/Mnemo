@@ -1,0 +1,30 @@
+{
+  "name": "006-obsidian-export",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "**006-obsidian-export** (Phase 2)\n\nScheduled. Writes one .md per ready note into `$OBSIDIAN_VAULT_PATH` with YAML frontmatter (tags, created, source_url).",
+        "height": 220, "width": 460, "color": 6
+      },
+      "id": "note", "name": "Spec",
+      "type": "n8n-nodes-base.stickyNote", "typeVersion": 1,
+      "position": [200, 60]
+    },
+    {
+      "parameters": {"rule": {"interval": [{"field": "minutes", "minutesInterval": 30}]}},
+      "id": "cron", "name": "Every 30 min",
+      "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1,
+      "position": [200, 380]
+    },
+    {
+      "parameters": {"functionCode": "// TODO(milestone-2): pull notes, render markdown, write to /data/obsidian.\nreturn [{ json: { stub: true } }];"},
+      "id": "stub", "name": "Stub",
+      "type": "n8n-nodes-base.function", "typeVersion": 1,
+      "position": [460, 380]
+    }
+  ],
+  "connections": {"Every 30 min": {"main": [[{"node": "Stub", "type": "main", "index": 0}]]}},
+  "active": false,
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "mnemo"}, {"name": "export"}]
+}

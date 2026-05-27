@@ -1,0 +1,30 @@
+{
+  "name": "008-dead-link-checker",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "**008-dead-link-checker** (Phase 3)\n\nWeekly. For every note with source_url, HEAD request. On non-2xx, PATCH the note via API to set source_metadata.dead_since = now.",
+        "height": 220, "width": 460, "color": 6
+      },
+      "id": "note", "name": "Spec",
+      "type": "n8n-nodes-base.stickyNote", "typeVersion": 1,
+      "position": [200, 60]
+    },
+    {
+      "parameters": {"rule": {"interval": [{"field": "weeks", "weeksInterval": 1}]}},
+      "id": "cron", "name": "Weekly",
+      "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1,
+      "position": [200, 380]
+    },
+    {
+      "parameters": {"functionCode": "// TODO(milestone-3): iterate notes via Mnemo API, HEAD each url, PATCH dead_since.\nreturn [{ json: { stub: true } }];"},
+      "id": "stub", "name": "Stub",
+      "type": "n8n-nodes-base.function", "typeVersion": 1,
+      "position": [460, 380]
+    }
+  ],
+  "connections": {"Weekly": {"main": [[{"node": "Stub", "type": "main", "index": 0}]]}},
+  "active": false,
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "mnemo"}, {"name": "cleanup"}]
+}

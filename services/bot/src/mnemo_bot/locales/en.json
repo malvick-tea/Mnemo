@@ -1,0 +1,13 @@
+{
+  "welcome": "Welcome to Mnemo — your self-hosted second brain.",
+  "help_hint": "See /help for all commands.",
+  "saving": "Saving…",
+  "saved": "Saved",
+  "transcribing": "Transcribing…",
+  "thinking": "Thinking…",
+  "throttle": "Slow down a moment — too many requests this minute.",
+  "errors": {
+    "generic": "Something went wrong.",
+    "auth_required": "You're not on the allowlist for this Mnemo instance."
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "name": "005-notion-sync",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "**005-notion-sync** (Phase 1 sketch)\n\nScheduled every 15 min. Pulls new/changed notes from Mnemo API since last_synced_at, pushes to user-configured Notion DB, updates last_synced_at.",
+        "height": 240, "width": 460, "color": 6
+      },
+      "id": "note", "name": "Spec",
+      "type": "n8n-nodes-base.stickyNote", "typeVersion": 1,
+      "position": [200, 60]
+    },
+    {
+      "parameters": {
+        "rule": {"interval": [{"field": "minutes", "minutesInterval": 15}]}
+      },
+      "id": "cron", "name": "Every 15 min",
+      "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1,
+      "position": [200, 380]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.MNEMO_API_BASE_URL}}/v1/notes",
+        "queryParameters": {
+          "parameters": [{"name": "limit", "value": "100"}]
+        }
+      },
+      "id": "fetch", "name": "List recent notes",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4,
+      "position": [460, 380],
+      "retryOnFail": true, "maxTries": 3
+    },
+    {
+      "parameters": {
+        "functionCode": "// TODO(milestone-3): map each note → Notion API call. Stub returns count.\nreturn [{ json: { synced_count: items.length } }];"
+      },
+      "id": "map", "name": "Map to Notion (stub)",
+      "type": "n8n-nodes-base.function", "typeVersion": 1,
+      "position": [720, 380]
+    }
+  ],
+  "connections": {
+    "Every 15 min": {"main": [[{"node": "List recent notes", "type": "main", "index": 0}]]},
+    "List recent notes": {"main": [[{"node": "Map to Notion (stub)", "type": "main", "index": 0}]]}
+  },
+  "active": false,
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "mnemo"}, {"name": "sync"}]
+}

@@ -1,0 +1,30 @@
+{
+  "name": "003-photo-ocr",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "**003-photo-ocr** (milestone-2 stub)\n\nMnemo POSTs `{note_id, blob_key}`. Workflow downloads from MinIO, runs Qwen2-VL / GPT-4o for OCR + scene description, tags, embeds, callback.",
+        "height": 240, "width": 460, "color": 3
+      },
+      "id": "note", "name": "Spec",
+      "type": "n8n-nodes-base.stickyNote", "typeVersion": 1,
+      "position": [200, 60]
+    },
+    {
+      "parameters": {"httpMethod": "POST", "path": "mnemo/003-photo-ocr", "options": {"responseMode": "responseNode"}},
+      "id": "trigger", "name": "Webhook",
+      "type": "n8n-nodes-base.webhook", "typeVersion": 2,
+      "position": [200, 380]
+    },
+    {
+      "parameters": {"respondWith": "json", "responseBody": "={{ { ok: true, stub: true } }}"},
+      "id": "respond", "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook", "typeVersion": 1,
+      "position": [460, 380]
+    }
+  ],
+  "connections": {"Webhook": {"main": [[{"node": "Respond", "type": "main", "index": 0}]]}},
+  "active": false,
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "mnemo"}, {"name": "stub"}]
+}

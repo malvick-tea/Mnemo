@@ -1,0 +1,46 @@
+# Mnemo
+
+# Secrets
+.env
+.env.*
+!.env.example
+Caddyfile
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+dist/
+build/
+.dist/
+*.egg
+.venv/
+venv/
+
+# uv
+# services lock files are tracked; root lock is not
+/uv.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Runtime
+backups/
+logs/
+*.log
+data/
+
+# n8n local export workspace
+n8n/.exports/

@@ -1,0 +1,30 @@
+{
+  "name": "004-document-parse",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "**004-document-parse** (milestone-2 stub)\n\nMnemo POSTs `{note_id, blob_key, mime}`. Workflow branches by mime: PDF → pdfminer/Tika, DOCX → python-docx, EPUB → ebooklib, MD/TXT passthrough. Then summarize, tag, embed, callback.",
+        "height": 240, "width": 460, "color": 3
+      },
+      "id": "note", "name": "Spec",
+      "type": "n8n-nodes-base.stickyNote", "typeVersion": 1,
+      "position": [200, 60]
+    },
+    {
+      "parameters": {"httpMethod": "POST", "path": "mnemo/004-document-parse", "options": {"responseMode": "responseNode"}},
+      "id": "trigger", "name": "Webhook",
+      "type": "n8n-nodes-base.webhook", "typeVersion": 2,
+      "position": [200, 380]
+    },
+    {
+      "parameters": {"respondWith": "json", "responseBody": "={{ { ok: true, stub: true } }}"},
+      "id": "respond", "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook", "typeVersion": 1,
+      "position": [460, 380]
+    }
+  ],
+  "connections": {"Webhook": {"main": [[{"node": "Respond", "type": "main", "index": 0}]]}},
+  "active": false,
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "mnemo"}, {"name": "stub"}]
+}
