@@ -66,12 +66,25 @@ jobs:
           uv venv .venv
           source .venv/bin/activate
           uv pip install -e ".[dev]"
+      - name: Prepare test secrets
+        env:
+          CI_JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
+          CI_HMAC_SECRET: ${{ secrets.CI_HMAC_SECRET }}
+          CI_ENC_KEY: ${{ secrets.CI_ENC_KEY }}
+        run: |
+          python - <<'PY' >> "$GITHUB_ENV"
+          import base64
+          import os
+          import secrets
+
+          print(f"MNEMO_SERVICE_JWT_SECRET={os.environ.get('CI_JWT_SECRET') or secrets.token_urlsafe(48)}")
+          print(f"MNEMO_WEBHOOK_HMAC_SECRET={os.environ.get('CI_HMAC_SECRET') or secrets.token_urlsafe(48)}")
+          enc = os.environ.get("CI_ENC_KEY") or base64.b64encode(secrets.token_bytes(32)).decode("ascii")
+          print(f"MNEMO_ENCRYPTION_KEY={enc}")
+          PY
       - name: Unit tests
         working-directory: services/${{ matrix.service }}
         env:
-          MNEMO_SERVICE_JWT_SECRET: ${{ secrets.CI_JWT_SECRET || 'x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x' }}
-          MNEMO_WEBHOOK_HMAC_SECRET: ${{ secrets.CI_HMAC_SECRET || 'y_y_y_y_y_y_y_y_y_y_y_y_y_y_y_y' }}
-          MNEMO_ENCRYPTION_KEY: ${{ secrets.CI_ENC_KEY || 'enp6enp6enp6enp6enp6enp6enp6enp6enp6enp6eno=' }}
           TELEGRAM_BOT_TOKEN: dummy:dummy
           POSTGRES_USER: mnemo
           POSTGRES_PASSWORD: mnemo
@@ -118,6 +131,22 @@ jobs:
           uv venv .venv
           source .venv/bin/activate
           uv pip install -e ".[dev]"
+      - name: Prepare test secrets
+        env:
+          CI_JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
+          CI_HMAC_SECRET: ${{ secrets.CI_HMAC_SECRET }}
+          CI_ENC_KEY: ${{ secrets.CI_ENC_KEY }}
+        run: |
+          python - <<'PY' >> "$GITHUB_ENV"
+          import base64
+          import os
+          import secrets
+
+          print(f"MNEMO_SERVICE_JWT_SECRET={os.environ.get('CI_JWT_SECRET') or secrets.token_urlsafe(48)}")
+          print(f"MNEMO_WEBHOOK_HMAC_SECRET={os.environ.get('CI_HMAC_SECRET') or secrets.token_urlsafe(48)}")
+          enc = os.environ.get("CI_ENC_KEY") or base64.b64encode(secrets.token_bytes(32)).decode("ascii")
+          print(f"MNEMO_ENCRYPTION_KEY={enc}")
+          PY
       - name: Integration tests
         working-directory: services/api
         env:
@@ -128,9 +157,6 @@ jobs:
           POSTGRES_DB: mnemo_test
           QDRANT_URL: http://localhost:6333
           REDIS_URL: redis://localhost:6379/0
-          MNEMO_SERVICE_JWT_SECRET: x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x
-          MNEMO_WEBHOOK_HMAC_SECRET: y_y_y_y_y_y_y_y_y_y_y_y_y_y_y_y
-          MNEMO_ENCRYPTION_KEY: enp6enp6enp6enp6enp6enp6enp6enp6enp6enp6eno=
           MINIO_ACCESS_KEY: mnemo
           MINIO_SECRET_KEY: mnemo_secret
           MNEMO_LLM_PROVIDER: ollama
