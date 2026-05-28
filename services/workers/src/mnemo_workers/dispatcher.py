@@ -19,7 +19,10 @@ from mnemo_api.config import get_settings
 from mnemo_api.logging import configure_logging, get_logger
 from mnemo_workers.tasks.embed import embed_note
 from mnemo_workers.tasks.n8n import trigger_n8n_workflow
+from mnemo_workers.tasks.process_document import process_document_note
+from mnemo_workers.tasks.process_photo import process_photo_note
 from mnemo_workers.tasks.process_text import process_text_note
+from mnemo_workers.tasks.process_voice import process_voice_note
 from mnemo_workers.tasks.summarize import summarize_note
 from mnemo_workers.tasks.tag import tag_note
 
@@ -27,6 +30,9 @@ _TASK_QUEUE = "mnemo:tasks"
 
 _ACTORS: dict[str, Any] = {
     "process_text_note": process_text_note,
+    "process_voice_note": process_voice_note,
+    "process_photo_note": process_photo_note,
+    "process_document_note": process_document_note,
     "embed_note": embed_note,
     "summarize_note": summarize_note,
     "tag_note": tag_note,

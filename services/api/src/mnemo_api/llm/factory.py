@@ -25,6 +25,23 @@ def make_llm(settings: Settings) -> LLMClient:
     raise MnemoError(f"Unknown LLM provider: {settings.llm_provider}")
 
 
+def make_vision_llm(settings: Settings) -> OpenRouterClient:
+    """Vision capture requires OpenRouter regardless of MNEMO_LLM_PROVIDER.
+
+    Ollama vision (llava etc.) is planned for milestone-3 — until then we
+    require an OpenRouter key to enable photo capture.
+    """
+    if not settings.openrouter_api_key:
+        raise MnemoError(
+            "Vision (photo capture) requires OPENROUTER_API_KEY. "
+            "Ollama-native vision is on the milestone-3 roadmap."
+        )
+    return OpenRouterClient(
+        base_url=settings.openrouter_base_url,
+        api_key=settings.openrouter_api_key.get_secret_value(),
+    )
+
+
 def make_embedder(settings: Settings) -> Embedder:
     if settings.embed_provider == "ollama":
         return OllamaEmbedder(

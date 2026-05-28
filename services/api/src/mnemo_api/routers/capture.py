@@ -1,19 +1,26 @@
-"""Capture endpoints."""
+"""Capture endpoints.
+
+Heavy uploads (voice/photo/document) stream into MinIO; light captures
+(text, url, forward) carry the content in the JSON body. All paths end in
+a Note row + a worker enqueue so the API stays responsive.
+"""
 
 from __future__ import annotations
 
 import io
 from datetime import UTC, datetime
-from typing import cast
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
-from minio import Minio
-from redis.asyncio import Redis
 
 from mnemo_api.config import get_settings
-from mnemo_api.deps import CurrentUser, SessionDep, get_minio, get_redis
-from mnemo_api.schemas import CaptureResponse, CaptureTextIn, CaptureURLIn
+from mnemo_api.deps import CurrentUser, MinioDep, RedisDep, SessionDep
+from mnemo_api.schemas import (
+    CaptureForwardIn,
+    CaptureResponse,
+    CaptureTextIn,
+    CaptureURLIn,
+)
 from mnemo_api.services import capture as capture_svc
 
 router = APIRouter(prefix="/v1/capture", tags=["capture"])
@@ -24,7 +31,7 @@ async def capture_text(
     payload: CaptureTextIn,
     user: CurrentUser,
     session: SessionDep,
-    redis: Redis = get_redis,  # type: ignore[assignment]
+    redis: RedisDep,
 ) -> CaptureResponse:
     note = await capture_svc.create_text_note(
         session, redis,
@@ -42,7 +49,7 @@ async def capture_url(
     payload: CaptureURLIn,
     user: CurrentUser,
     session: SessionDep,
-    redis: Redis = get_redis,  # type: ignore[assignment]
+    redis: RedisDep,
 ) -> CaptureResponse:
     note = await capture_svc.create_url_note(
         session, redis,
@@ -59,17 +66,14 @@ async def capture_url(
 async def capture_voice(
     user: CurrentUser,
     session: SessionDep,
+    redis: RedisDep,
+    minio: MinioDep,
     file: UploadFile = File(...),
     captured_at: datetime = Form(default_factory=lambda: datetime.now(UTC)),
-    redis: Redis = get_redis,            # type: ignore[assignment]
-    minio: Minio = get_minio,            # type: ignore[assignment]
 ) -> CaptureResponse:
     settings = get_settings()
     body = await _read_capped(file, settings.max_upload_mb)
-    blob_key = (
-        f"{user.id}/{datetime.now(UTC):%Y/%m}/{uuid4()}/"
-        f"{file.filename or 'voice.ogg'}"
-    )
+    blob_key = _build_blob_key(user.id, file.filename or "voice.ogg")
     _put_object(minio, settings.minio_bucket, blob_key, body, file.content_type)
     note = await capture_svc.create_voice_note(
         session, redis,
@@ -86,32 +90,107 @@ async def capture_voice(
 async def capture_photo(
     user: CurrentUser,
     session: SessionDep,
+    redis: RedisDep,
+    minio: MinioDep,
     file: UploadFile = File(...),
+    caption: str | None = Form(default=None),
+    captured_at: datetime = Form(default_factory=lambda: datetime.now(UTC)),
 ) -> CaptureResponse:
-    # TODO(milestone-2): wire photo OCR pipeline (n8n workflow 003-photo-ocr).
-    raise HTTPException(501, detail="photo capture not yet implemented (milestone-2)")
+    settings = get_settings()
+    body = await _read_capped(file, settings.max_upload_mb)
+    mime = (file.content_type or "image/jpeg").lower()
+    if not mime.startswith("image/"):
+        raise HTTPException(415, f"Not an image MIME type: {mime}")
+    blob_key = _build_blob_key(user.id, file.filename or "photo.jpg")
+    _put_object(minio, settings.minio_bucket, blob_key, body, mime)
+    note = await capture_svc.create_photo_note(
+        session, redis,
+        user=user,
+        blob_key=blob_key,
+        caption=caption,
+        captured_at=captured_at,
+        source_metadata={"size_bytes": len(body), "mime": mime},
+    )
+    await session.commit()
+    return CaptureResponse(note_id=note.id, status=note.status)  # type: ignore[arg-type]
+
+
+_ALLOWED_DOC_MIMES = frozenset({
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/epub+zip",
+    "text/plain",
+    "text/markdown",
+    "application/octet-stream",  # Telegram sometimes sends this for .md
+})
 
 
 @router.post("/document", response_model=CaptureResponse, status_code=201)
 async def capture_document(
     user: CurrentUser,
     session: SessionDep,
+    redis: RedisDep,
+    minio: MinioDep,
     file: UploadFile = File(...),
+    captured_at: datetime = Form(default_factory=lambda: datetime.now(UTC)),
 ) -> CaptureResponse:
-    # TODO(milestone-2): wire document parsing (n8n workflow 004-document-parse).
-    raise HTTPException(501, detail="document capture not yet implemented (milestone-2)")
+    settings = get_settings()
+    body = await _read_capped(file, settings.max_upload_mb)
+    mime = (file.content_type or "application/octet-stream").lower()
+    filename = file.filename or "document"
+    if mime not in _ALLOWED_DOC_MIMES and not _has_known_ext(filename):
+        raise HTTPException(
+            415, f"Unsupported document type: {mime} ({filename})"
+        )
+    blob_key = _build_blob_key(user.id, filename)
+    _put_object(minio, settings.minio_bucket, blob_key, body, mime)
+    note = await capture_svc.create_document_note(
+        session, redis,
+        user=user,
+        blob_key=blob_key,
+        filename=filename,
+        mime=mime,
+        captured_at=captured_at,
+        source_metadata={"size_bytes": len(body)},
+    )
+    await session.commit()
+    return CaptureResponse(note_id=note.id, status=note.status)  # type: ignore[arg-type]
 
 
 @router.post("/forward", response_model=CaptureResponse, status_code=201)
 async def capture_forward(
+    payload: CaptureForwardIn,
     user: CurrentUser,
     session: SessionDep,
+    redis: RedisDep,
 ) -> CaptureResponse:
-    # TODO(milestone-2): wire forwarded message capture.
-    raise HTTPException(501, detail="forward capture not yet implemented (milestone-2)")
+    forward_meta = payload.forward.model_dump(mode="json", exclude_none=True)
+    note = await capture_svc.create_forward_note(
+        session, redis,
+        user=user,
+        content=payload.content,
+        forward_metadata=forward_meta,
+        captured_at=payload.captured_at,
+        source_metadata=payload.source_metadata,
+    )
+    await session.commit()
+    return CaptureResponse(note_id=note.id, status=note.status)  # type: ignore[arg-type]
 
 
 # ─── helpers ────────────────────────────────────────────────────────────────
+
+
+_KNOWN_DOC_EXTS = (".pdf", ".docx", ".epub", ".md", ".markdown", ".txt")
+
+
+def _has_known_ext(filename: str) -> bool:
+    return filename.lower().endswith(_KNOWN_DOC_EXTS)
+
+
+def _build_blob_key(user_id: UUID, filename: str) -> str:
+    return (
+        f"{user_id}/{datetime.now(UTC):%Y/%m}/{uuid4()}/{filename}"
+    )
 
 
 async def _read_capped(upload: UploadFile, max_mb: int) -> bytes:
@@ -123,13 +202,19 @@ async def _read_capped(upload: UploadFile, max_mb: int) -> bytes:
 
 
 def _put_object(
-    minio: Minio, bucket: str, key: str, body: bytes, content_type: str | None
+    minio: object,
+    bucket: str,
+    key: str,
+    body: bytes,
+    content_type: str | None,
 ) -> None:
-    minio.put_object(
+    # minio is a Minio instance; typing as `object` here so the signature
+    # works whether or not the runtime client is the real Minio class
+    # (tests can pass a stub).
+    minio.put_object(  # type: ignore[attr-defined]
         bucket,
         key,
         data=io.BytesIO(body),
         length=len(body),
         content_type=content_type or "application/octet-stream",
     )
-    _ = cast(object, minio)  # mypy: silence "unused minio after call" smell

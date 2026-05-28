@@ -1,9 +1,11 @@
 """Pydantic API schemas (DTOs)."""
 
 from mnemo_api.schemas.capture import (
+    CaptureForwardIn,
+    CaptureResponse,
     CaptureTextIn,
     CaptureURLIn,
-    CaptureResponse,
+    ForwardMetadata,
 )
 from mnemo_api.schemas.note import NoteOut, NotePatch, TagOut
 from mnemo_api.schemas.query import (
@@ -18,10 +20,12 @@ from mnemo_api.schemas.webhooks import (
 )
 
 __all__ = [
+    "CaptureForwardIn",
     "CaptureResponse",
     "CaptureTextIn",
     "CaptureURLIn",
     "Citation",
+    "ForwardMetadata",
     "N8NNoteFailedIn",
     "N8NNoteReadyIn",
     "NoteOut",

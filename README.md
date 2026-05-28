@@ -70,8 +70,9 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full picture.
 
 ## Project status
 
-🚧 **Phase 1 (MVP)** — text capture + RAG vertical slice. Voice, URL, photo,
-document, forwards are coming next. See [PLAN.md](PLAN.md).
+🚧 **Phase 1 + 2 (MVP)** — all capture types wired (text · URL · voice ·
+photo · document · forward) + RAG. Integrations (Notion/Obsidian/Anki) and
+the admin webapp land in Phase 3 / Phase 4. See [PLAN.md](PLAN.md).
 
 ## Documentation
 

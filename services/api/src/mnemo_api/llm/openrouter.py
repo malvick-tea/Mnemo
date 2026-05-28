@@ -7,6 +7,7 @@ universally supported — for embeddings prefer Ollama (bge-m3) or OpenAI.
 
 from __future__ import annotations
 
+import base64
 from typing import Any, Literal
 
 import httpx
@@ -33,7 +34,6 @@ class OpenRouterClient:
             timeout=timeout,
             headers={
                 "Authorization": f"Bearer {api_key}",
-                # OpenRouter recommends sending these:
                 "X-Title": "Mnemo",
             },
         )
@@ -57,6 +57,48 @@ class OpenRouterClient:
         if response_format == "json":
             payload["response_format"] = {"type": "json_object"}
 
+        return await self._call(payload, model, prompt_fingerprint)
+
+    async def chat_vision(
+        self,
+        *,
+        prompt: str,
+        image_bytes: bytes,
+        mime: str,
+        model: str,
+        max_tokens: int = 800,
+        temperature: float = 0.2,
+        prompt_fingerprint: str | None = None,
+    ) -> CompletionResult:
+        """Multi-modal call with one image. Returns the text description.
+
+        We inline the image as a data URL — keeps the call stateless and
+        avoids exposing MinIO. ~3-4x the bytes vs raw, fine for ≤10 MB.
+        """
+        b64 = base64.b64encode(image_bytes).decode("ascii")
+        data_url = f"data:{mime};base64,{b64}"
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": data_url}},
+                    ],
+                }
+            ],
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }
+        return await self._call(payload, model, prompt_fingerprint)
+
+    async def _call(
+        self,
+        payload: dict[str, Any],
+        model: str,
+        prompt_fingerprint: str | None,
+    ) -> CompletionResult:
         retrying = AsyncRetrying(
             stop=stop_after_attempt(3),
             wait=wait_exponential(multiplier=0.5, max=10),

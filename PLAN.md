@@ -37,13 +37,37 @@ Goal: `text → bot → API → DB → embed (worker) → Qdrant → query → a
 
 ## Phase 2 — Other capture types
 
-- [ ] Voice capture (faster-whisper) — handler + n8n workflow `002`
-- [ ] URL capture (trafilatura + Playwright fallback) — handler + n8n workflow `001`
-- [ ] Photo OCR — handler + n8n workflow `003`
-- [ ] Document parsing — handler + n8n workflow `004`
-- [ ] Forward capture — handler
+- [x] Voice capture — local `process_voice_note` actor (faster-whisper); n8n
+      `002-voice-transcribe` kept as alternative path for milestone-3
+- [x] URL capture — handler + n8n `001-url-ingest` (functional); callback
+      chains into the text pipeline so chunks/embeddings/pub-sub fire
+- [x] Photo capture — local `process_photo_note` actor calls the vision LLM
+      (`MNEMO_MODEL_VISION` via OpenRouter) for OCR + scene description; n8n
+      `003-photo-ocr` kept as alternative
+- [x] Document capture — local `process_document_note` actor for
+      PDF/DOCX/EPUB/MD/TXT extraction; n8n `004-document-parse` kept as
+      alternative
+- [x] Forward capture — handler preserves `forward_origin` provenance into
+      `Note.source_metadata.forward`
 
-Phase 2 handlers in `services/bot` are stubbed in this commit with `NotImplementedError("TODO(milestone-2)")` to keep router wiring honest.
+### Phase 2 implementation notes
+
+All four "heavy" types share the same shape:
+
+```
+bot handler → /v1/capture/<kind>  (MinIO upload, except forward/text/url)
+            → create_<kind>_note  (Note row + enqueue process_<kind>_note)
+            → worker actor        (extract → set processed_content)
+            → process_text_note   (summarize, tag, chunk, embed, publish)
+```
+
+The URL bug fix in `routers/webhooks_n8n._handle_note_ready` chains the
+n8n callback into `process_text_note` instead of leaving the note in
+`processing` status. Same hand-off pattern that voice/photo/document use.
+
+Worker container needs `ffmpeg` + `libgomp1` for faster-whisper; the
+Dockerfile installs them. The vision path requires `OPENROUTER_API_KEY`
+regardless of `MNEMO_LLM_PROVIDER` (Ollama-native vision is milestone-3).
 
 ## Phase 3 — Digest & integrations
 

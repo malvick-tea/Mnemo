@@ -12,12 +12,16 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException, Request
+from minio import Minio
+from qdrant_client import AsyncQdrantClient
+from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mnemo_api.auth import verify_service_token
 from mnemo_api.db import get_session
 from mnemo_api.exceptions import AuthError, ForbiddenError
+from mnemo_api.llm.base import Embedder, LLMClient
 from mnemo_api.models import User
 
 
@@ -63,21 +67,28 @@ async def user_or_id(user: CurrentUser, note_user_id: UUID) -> User:
     return user
 
 
-def get_qdrant(request: Request) -> object:
-    return request.app.state.qdrant
+def get_qdrant(request: Request) -> AsyncQdrantClient:
+    return request.app.state.qdrant  # type: ignore[no-any-return]
 
 
-def get_redis(request: Request) -> object:
-    return request.app.state.redis
+def get_redis(request: Request) -> Redis:
+    return request.app.state.redis  # type: ignore[no-any-return]
 
 
-def get_minio(request: Request) -> object:
-    return request.app.state.minio
+def get_minio(request: Request) -> Minio:
+    return request.app.state.minio  # type: ignore[no-any-return]
 
 
-def get_llm(request: Request) -> object:
-    return request.app.state.llm
+def get_llm(request: Request) -> LLMClient:
+    return request.app.state.llm  # type: ignore[no-any-return]
 
 
-def get_embedder(request: Request) -> object:
-    return request.app.state.embedder
+def get_embedder(request: Request) -> Embedder:
+    return request.app.state.embedder  # type: ignore[no-any-return]
+
+
+RedisDep = Annotated[Redis, Depends(get_redis)]
+MinioDep = Annotated[Minio, Depends(get_minio)]
+QdrantDep = Annotated[AsyncQdrantClient, Depends(get_qdrant)]
+LLMDep = Annotated[LLMClient, Depends(get_llm)]
+EmbedderDep = Annotated[Embedder, Depends(get_embedder)]

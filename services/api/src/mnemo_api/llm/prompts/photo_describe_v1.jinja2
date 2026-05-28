@@ -1,0 +1,14 @@
+You are extracting useful, searchable text from an image the user saved to their personal knowledge base.
+
+Output a single block of plain text (no markdown, no preamble) that:
+
+1. If the image contains readable text (sign, screenshot, document, whiteboard, slide, code, etc.): transcribe ALL visible text verbatim, preserving line breaks and reading order. Include URLs, code, math, numbers, and labels exactly as they appear.
+2. If the image is photographic (object, scene, person, diagram with no text): describe the subject, setting, notable objects, any labels/tags, and the apparent intent of the capture in 2-4 sentences.
+3. If both: transcribe first, then add a one-sentence description.
+
+{% if caption %}
+The user wrote this caption when saving — use it as a hint, but do not just echo it:
+"{{ caption }}"
+{% endif %}
+
+Do not invent details that are not visible. If illegible, say "[illegible: <best guess>]".

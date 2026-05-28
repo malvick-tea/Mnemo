@@ -42,7 +42,7 @@ def _service_token(tg_user_id: int) -> str:
 class ApiClient:
     def __init__(self) -> None:
         self._client = httpx.AsyncClient(
-            base_url=get_settings().api_base_url, timeout=30.0
+            base_url=get_settings().api_base_url, timeout=60.0
         )
 
     async def aclose(self) -> None:
@@ -74,6 +74,51 @@ class ApiClient:
         files = {"file": (filename, file_bytes, content_type)}
         return await self._request(
             tg_user_id, "POST", "/v1/capture/voice", files=files
+        )
+
+    async def capture_photo(
+        self,
+        tg_user_id: int,
+        file_bytes: bytes,
+        filename: str,
+        content_type: str,
+        caption: str | None = None,
+    ) -> dict[str, Any]:
+        files = {"file": (filename, file_bytes, content_type)}
+        data: dict[str, str] = {}
+        if caption:
+            data["caption"] = caption
+        return await self._request(
+            tg_user_id, "POST", "/v1/capture/photo",
+            files=files, data=data,
+        )
+
+    async def capture_document(
+        self,
+        tg_user_id: int,
+        file_bytes: bytes,
+        filename: str,
+        content_type: str,
+    ) -> dict[str, Any]:
+        files = {"file": (filename, file_bytes, content_type)}
+        return await self._request(
+            tg_user_id, "POST", "/v1/capture/document", files=files
+        )
+
+    async def capture_forward(
+        self,
+        tg_user_id: int,
+        content: str,
+        forward: dict[str, Any],
+        source_metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return await self._request(
+            tg_user_id, "POST", "/v1/capture/forward",
+            json={
+                "content": content,
+                "forward": forward,
+                "source_metadata": source_metadata or {},
+            },
         )
 
     async def query(self, tg_user_id: int, q: str, top_k: int = 8) -> dict[str, Any]:

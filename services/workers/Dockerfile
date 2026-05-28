@@ -3,8 +3,11 @@ FROM python:3.12-slim-bookworm AS base
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 \
     UV_PROJECT_ENVIRONMENT=/opt/venv PATH=/opt/venv/bin:$PATH
 
+# ffmpeg: audio decoding for faster-whisper
+# libgomp1: OpenMP runtime needed by ctranslate2 (faster-whisper backend)
+# libpq5: asyncpg
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates curl libpq5 \
+        ca-certificates curl libpq5 ffmpeg libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:0.5.13 /uv /usr/local/bin/
