@@ -71,20 +71,48 @@ regardless of `MNEMO_LLM_PROVIDER` (Ollama-native vision is milestone-3).
 
 ## Phase 3 — Digest & integrations
 
-- [ ] Daily digest cron (Dramatiq periodic actor)
-- [ ] Weekly review
-- [ ] Notion sync workflow `005`
-- [ ] Obsidian export `006`
-- [ ] Anki cards `007`
+- [x] Daily digest cron via APScheduler + `run_daily_digest_for_all_users`
+      actor + bot listener on `digest.daily.<user_id>`
+- [x] Weekly review endpoint (`GET /v1/digest/weekly`)
+- [x] Notion sync — local `notion_sync.py` actor (15-min cron) pushes
+      ready notes to user's configured Notion DB
+- [x] Obsidian export — local `obsidian_export.py` actor (30-min cron)
+      writes `.md` per note into `/data/obsidian` (Docker volume)
+- [x] Anki cards — `/v1/notes/{id}/anki` endpoint + bot `/anki <short_id>`
+      command + 🎴 inline button. Cards delivered as a Telegram message;
+      AnkiConnect direct-push deferred to milestone-3
+
+Per ADR-003 these stay in local Dramatiq actors. n8n workflows 005-007
+ship as inactive scaffolds for users who prefer the visual editor.
 
 ## Phase 4 — Polish
 
-- [ ] Webapp admin (FastAPI + HTMX)
-- [ ] Backup/restore scripts
-- [ ] CI: lint + test + build images
+- [x] Webapp admin — minimal FastAPI + HTMX read-only UI at
+      `/admin/` (via Caddy basicauth). Notes list, recent queries,
+      tag cloud. See `services/webapp/`.
+- [x] Backup/restore scripts (source `.env`, MinIO skip guard)
+- [x] CI: lint + test + build images (`.github/workflows/`)
 - [ ] README screenshots via `scripts/seed_demo.py`
-- [ ] `docs/setup-vps.md` walkthrough
-- [ ] Threat model in `SECURITY.md`
+- [ ] `docs/setup-vps.md` walkthrough — currently a placeholder
+- [ ] Threat model in `SECURITY.md` — currently a placeholder
+
+### Bug fixes shipped alongside Phase 3+4
+
+- `_handle_note_ready` left URL notes stuck in `processing`; now chains
+  into `process_text_note` for chunk+embed+publish.
+- `hybrid_search` was reporting all sources as `("rrf",)`; `_rrf_fuse`
+  now tracks contributing retrievers via `_FusionEntry`.
+- Bot listener relied on a `mnemo:user:<id>` Redis mapping that nothing
+  populated → moved `tg_user_id` into the pub/sub payload itself.
+- `digest.daily.<user_id>` channel had no bot listener → renamed
+  `listen_note_ready` → `listen_bot_events` and subscribed to both.
+- `delete_note` left Qdrant orphans → now filtered-delete by `note_id`.
+- `make_embedder("openai")` used the OpenRouter API key (contradicting
+  its own error message); added a real `OPENAI_API_KEY` setting.
+- `capture.py` router used `redis: Redis = get_redis` (passes the
+  function as a default), now `Annotated[Redis, Depends(get_redis)]`
+  via new `RedisDep`/`MinioDep`/`QdrantDep`/`LLMDep`/`EmbedderDep`.
+- `backup.sh` didn't source `.env`, so MINIO env vars were missing.
 
 ## Decisions log
 

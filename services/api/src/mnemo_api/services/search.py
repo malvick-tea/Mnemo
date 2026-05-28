@@ -5,7 +5,7 @@ See ADR-002 for the rationale (no per-corpus tuning required).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from uuid import UUID
 
 from qdrant_client import AsyncQdrantClient
@@ -38,6 +38,13 @@ class SearchHit:
     source_url: str | None
 
 
+@dataclass(slots=True)
+class _FusionEntry:
+    note_id: UUID
+    score: float = 0.0
+    sources: set[str] = field(default_factory=set)
+
+
 async def hybrid_search(
     *,
     session: AsyncSession,
@@ -65,7 +72,7 @@ async def hybrid_search(
         with_payload=True,
     )
 
-    vec_ranked = [
+    vec_ranked: list[tuple[UUID, UUID, float]] = [
         (
             UUID(point.payload["chunk_id"]),  # type: ignore[index]
             UUID(point.payload["note_id"]),  # type: ignore[index]
@@ -91,28 +98,33 @@ async def hybrid_search(
         ),
         {"q": query, "uid": user_id, "lim": candidate_pool},
     )
-    fts_ranked = [(r.chunk_id, r.note_id, float(r.r)) for r in fts_rows]
+    fts_ranked: list[tuple[UUID, UUID, float]] = [
+        (r.chunk_id, r.note_id, float(r.r)) for r in fts_rows
+    ]
 
-    fused = _rrf_fuse([vec_ranked, fts_ranked], k=rrf_k, labels=("vec", "fts"))
+    fused = _rrf_fuse(
+        rankings=[vec_ranked, fts_ranked],
+        labels=("vec", "fts"),
+        k=rrf_k,
+    )
     if not fused:
         return []
 
-    top_chunk_ids = [chunk_id for chunk_id, _, _ in fused[:top_k]]
+    top_chunk_ids = [chunk_id for chunk_id, _ in fused[:top_k]]
     chunks = await _hydrate_chunks(session, top_chunk_ids)
 
     hits: list[SearchHit] = []
-    for chunk_id, note_id, rrf_score in fused[:top_k]:
+    for chunk_id, entry in fused[:top_k]:
         chunk_meta = chunks.get(chunk_id)
         if chunk_meta is None:
             continue
-        sources = tuple(s for s, _, _ in fused if _ == note_id) or ("rrf",)
         hits.append(
             SearchHit(
-                note_id=note_id,
+                note_id=entry.note_id,
                 chunk_id=chunk_id,
                 score=chunk_meta["score"],
-                rrf_score=rrf_score,
-                source=sources,
+                rrf_score=entry.score,
+                source=tuple(sorted(entry.sources)) or ("rrf",),
                 content=chunk_meta["content"],
                 title=chunk_meta["title"],
                 captured_at=chunk_meta["captured_at"],
@@ -131,22 +143,24 @@ async def hybrid_search(
 
 
 def _rrf_fuse(
-    rankings: list[list[tuple[UUID, UUID, float]]],
     *,
-    k: int,
+    rankings: list[list[tuple[UUID, UUID, float]]],
     labels: tuple[str, ...],
-) -> list[tuple[UUID, UUID, float]]:
-    """Reciprocal Rank Fusion. Returns (chunk_id, note_id, fused_score)."""
-    scores: dict[UUID, list[float | UUID | str]] = {}
+    k: int,
+) -> list[tuple[UUID, _FusionEntry]]:
+    """Reciprocal Rank Fusion. Returns chunk_id → (note_id, score, sources)."""
+    entries: dict[UUID, _FusionEntry] = {}
     for label, ranking in zip(labels, rankings, strict=False):
         for rank, (chunk_id, note_id, _raw_score) in enumerate(ranking, start=1):
-            contrib = 1.0 / (k + rank)
-            slot = scores.setdefault(chunk_id, [note_id, 0.0])
-            slot[1] = float(slot[1]) + contrib  # type: ignore[operator]
-    fused = [(cid, slot[0], float(slot[1])) for cid, slot in scores.items()]
-    fused.sort(key=lambda x: x[2], reverse=True)
-    # type cast for mypy
-    return [(cid, nid, score) for cid, nid, score in fused if isinstance(nid, UUID)]
+            entry = entries.get(chunk_id)
+            if entry is None:
+                entry = _FusionEntry(note_id=note_id)
+                entries[chunk_id] = entry
+            entry.score += 1.0 / (k + rank)
+            entry.sources.add(label)
+    fused = list(entries.items())
+    fused.sort(key=lambda kv: kv[1].score, reverse=True)
+    return fused
 
 
 async def _hydrate_chunks(

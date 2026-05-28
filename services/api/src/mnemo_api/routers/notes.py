@@ -6,14 +6,20 @@ from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
+from qdrant_client.http.models import FieldCondition, Filter, FilterSelector, MatchValue
 from sqlalchemy import func, select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from mnemo_api.deps import CurrentUser, SessionDep
-from mnemo_api.models import Note, NoteStatus, NoteTag, Tag
-from mnemo_api.schemas import NoteOut, NotePatch, TagOut
+from mnemo_api.config import get_settings
+from mnemo_api.deps import CurrentUser, LLMDep, QdrantDep, SessionDep
+from mnemo_api.exceptions import MnemoError
+from mnemo_api.logging import get_logger
+from mnemo_api.models import Note, NoteTag, Tag
+from mnemo_api.schemas import AnkiCardOut, AnkiCardsOut, NoteOut, NotePatch, TagOut
+from mnemo_api.services.anki import generate_cards
 
 router = APIRouter(prefix="/v1", tags=["notes"])
+log = get_logger(__name__)
 
 
 @router.get("/notes/{note_id}", response_model=NoteOut)
@@ -61,14 +67,37 @@ async def patch_note(
 
 
 @router.delete("/notes/{note_id}", status_code=204)
-async def delete_note(note_id: UUID, user: CurrentUser, session: SessionDep) -> None:
+async def delete_note(
+    note_id: UUID,
+    user: CurrentUser,
+    session: SessionDep,
+    qdrant: QdrantDep,
+) -> None:
     note = await session.get(Note, note_id)
     if note is None or note.user_id != user.id:
         raise HTTPException(404, "Note not found")
-    # Soft-delete: mark failed-style? For v1 we hard-delete and rely on
-    # ON DELETE CASCADE to remove chunks; vector cleanup happens in a worker.
+
     await session.delete(note)
     await session.commit()
+
+    # Drop the orphaned vectors. Filtered delete is O(matching), and we
+    # tolerate failure here — the row is gone, the search index will be
+    # consistent on the next periodic re-sync (milestone-3).
+    try:
+        await qdrant.delete(
+            collection_name=get_settings().qdrant_collection,
+            points_selector=FilterSelector(
+                filter=Filter(
+                    must=[
+                        FieldCondition(
+                            key="note_id", match=MatchValue(value=str(note_id))
+                        )
+                    ]
+                )
+            ),
+        )
+    except Exception:  # noqa: BLE001
+        log.exception("notes.delete.qdrant_cleanup_failed", note_id=str(note_id))
 
 
 @router.get("/notes", response_model=list[NoteOut])
@@ -102,6 +131,26 @@ async def list_notes(
     return out
 
 
+@router.post("/notes/{note_id}/anki", response_model=AnkiCardsOut)
+async def generate_anki(
+    note_id: UUID,
+    user: CurrentUser,
+    session: SessionDep,
+    llm: LLMDep,
+) -> AnkiCardsOut:
+    try:
+        result = await generate_cards(
+            session, llm, user_id=user.id, note_id=note_id
+        )
+    except MnemoError as exc:
+        raise HTTPException(exc.http_status, str(exc)) from exc
+    return AnkiCardsOut(
+        note_id=result.note_id,
+        cards=[AnkiCardOut(**c.to_dict()) for c in result.cards],
+        model_used=result.model_used,
+    )
+
+
 @router.get("/tags", response_model=list[TagOut])
 async def list_tags(user: CurrentUser, session: SessionDep) -> list[TagOut]:
     res = await session.execute(
@@ -120,7 +169,7 @@ async def list_tags(user: CurrentUser, session: SessionDep) -> list[TagOut]:
 # ─── helpers ────────────────────────────────────────────────────────────────
 
 
-async def _tags_for(session: SessionDep, note_id: UUID) -> list[TagOut]:
+async def _tags_for(session: AsyncSession, note_id: UUID) -> list[TagOut]:
     rows = await session.execute(
         select(Tag.id, Tag.name, Tag.color)
         .join(NoteTag, NoteTag.tag_id == Tag.id)
@@ -129,7 +178,9 @@ async def _tags_for(session: SessionDep, note_id: UUID) -> list[TagOut]:
     return [TagOut(id=r.id, name=r.name, color=r.color) for r in rows]
 
 
-async def _get_or_create_user_tag(session: SessionDep, user_id: UUID, name: str) -> Tag:
+async def _get_or_create_user_tag(
+    session: AsyncSession, user_id: UUID, name: str
+) -> Tag:
     res = await session.execute(
         select(Tag).where(Tag.user_id == user_id, Tag.name == name)
     )
@@ -158,8 +209,3 @@ def _to_dto(note: Note, tags: list[TagOut]) -> NoteOut:
         processed_at=note.processed_at,
         source_metadata=note.source_metadata,
     )
-
-
-# selectinload is intentionally imported but unused here — kept as a marker
-# for the future per-note tag eager-load optimisation.
-_ = selectinload

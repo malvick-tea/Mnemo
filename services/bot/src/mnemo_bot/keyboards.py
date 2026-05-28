@@ -14,7 +14,10 @@ def note_actions(note_id: UUID) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="🏷 Tags", callback_data=f"note:tags:{note_id}"),
                 InlineKeyboardButton(text="📝 Edit", callback_data=f"note:edit:{note_id}"),
                 InlineKeyboardButton(text="🗑 Delete", callback_data=f"note:delete:{note_id}"),
-            ]
+            ],
+            [
+                InlineKeyboardButton(text="🎴 Anki", callback_data=f"note:anki:{note_id}"),
+            ],
         ]
     )
 

@@ -1,4 +1,9 @@
-"""Cron-driven daily digest actor."""
+"""Cron-driven daily digest actor.
+
+Publishes a `digest.daily.<user_id>` event with the rendered digest text
+so the bot listener can deliver it via Telegram. We embed `tg_user_id`
+in the payload so the bot doesn't need a separate lookup.
+"""
 
 from __future__ import annotations
 
@@ -14,7 +19,7 @@ from mnemo_api.llm import make_llm
 from mnemo_api.logging import get_logger
 from mnemo_api.models import User
 from mnemo_api.services.digest import daily_digest
-from mnemo_workers.redis_io import get_redis
+from mnemo_workers.redis_io import get_redis, publish_digest
 from mnemo_workers.runner import run
 
 log = get_logger(__name__)
@@ -35,21 +40,20 @@ async def _run_for_all() -> None:
                     select(User).where(User.is_active.is_(True))
                 )
             ).scalars().all()
+            user_rows = [(u.id, u.tg_user_id) for u in users]
 
-        for user in users:
+        for user_id, tg_user_id in user_rows:
             try:
                 async with session_factory()() as session:
                     text = await daily_digest(
-                        session, llm, user_id=user.id, on_date=datetime.now(UTC)
+                        session, llm, user_id=user_id, on_date=datetime.now(UTC)
                     )
-                # Hand off to the bot via redis pubsub on a dedicated channel.
-                await redis.publish(
-                    f"digest.daily.{user.id}", text.encode("utf-8")
+                await publish_digest(
+                    redis, user_id=user_id, tg_user_id=tg_user_id, text=text
                 )
-                log.info("digest.daily.ok", user_id=str(user.id), len=len(text))
+                log.info("digest.daily.ok", user_id=str(user_id), len=len(text))
             except Exception:  # noqa: BLE001
-                log.exception("digest.daily.failed", user_id=str(user.id))
-            # Tiny sleep so we don't burst the LLM provider.
+                log.exception("digest.daily.failed", user_id=str(user_id))
             await asyncio.sleep(0.1)
     finally:
         close = getattr(llm, "aclose", None)

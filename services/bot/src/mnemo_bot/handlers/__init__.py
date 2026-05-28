@@ -1,6 +1,7 @@
 """All handlers — registered in `mnemo_bot.main`."""
 
 from mnemo_bot.handlers import (
+    anki,
     capture_document,
     capture_forward,
     capture_photo,
@@ -14,6 +15,7 @@ from mnemo_bot.handlers import (
 )
 
 __all__ = [
+    "anki",
     "capture_document",
     "capture_forward",
     "capture_photo",

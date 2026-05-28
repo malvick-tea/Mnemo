@@ -26,6 +26,7 @@ volumes:
   n8n_data:
   caddy_data:
   caddy_config:
+  obsidian_vault:
 
 services:
   # ─── Reverse proxy & TLS ───────────────────────────────────────────────────
@@ -123,12 +124,48 @@ services:
         condition: service_started
       redis:
         condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      # Obsidian export writes .md files into here. Configure
+      # OBSIDIAN_VAULT_PATH per user (defaults to /data/obsidian/<user_id>).
+      - obsidian_vault:/data/obsidian
     mem_limit: 2g
     healthcheck:
       test: ["CMD", "python", "-m", "mnemo_workers.healthcheck"]
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # ─── Dispatcher (Redis list → Dramatiq actor bridge) ───────────────────────
+  dispatcher:
+    image: mnemo/workers:latest
+    <<: *default-restart
+    logging: *default-logging
+    env_file: .env
+    networks: [internal]
+    depends_on:
+      workers:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    command: ["python", "-m", "mnemo_workers.dispatcher"]
+    mem_limit: 256m
+
+  # ─── Scheduler (APScheduler cron) ──────────────────────────────────────────
+  scheduler:
+    image: mnemo/workers:latest
+    <<: *default-restart
+    logging: *default-logging
+    env_file: .env
+    networks: [internal]
+    depends_on:
+      workers:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    command: ["python", "-m", "mnemo_workers.scheduler"]
+    mem_limit: 256m
 
   # ─── Postgres ──────────────────────────────────────────────────────────────
   postgres:

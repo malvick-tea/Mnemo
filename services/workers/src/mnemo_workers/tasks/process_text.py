@@ -19,7 +19,7 @@ from mnemo_api.config import get_settings
 from mnemo_api.db import session_factory
 from mnemo_api.llm import make_embedder, make_llm
 from mnemo_api.logging import get_logger
-from mnemo_api.models import Chunk, Note, NoteStatus
+from mnemo_api.models import Chunk, Note, NoteStatus, User
 from mnemo_api.services.chunking import split_into_chunks
 from mnemo_api.services.summarize import summarize
 from mnemo_api.services.tagging import suggest_and_apply_tags
@@ -42,6 +42,10 @@ async def _process_text_note(note_id: UUID) -> None:
     qdrant = get_qdrant_client()
     redis = get_redis()
 
+    chunk_count = 0
+    tg_user_id: int | None = None
+    user_id: UUID | None = None
+
     try:
         async with session_factory()() as session:
             note = (
@@ -50,6 +54,11 @@ async def _process_text_note(note_id: UUID) -> None:
             if note is None:
                 log.warning("process_text.missing", note_id=str(note_id))
                 return
+
+            user_id = note.user_id
+            user = await session.get(User, user_id)
+            if user is not None:
+                tg_user_id = user.tg_user_id
 
             note.status = NoteStatus.processing.value
             await session.commit()
@@ -61,18 +70,16 @@ async def _process_text_note(note_id: UUID) -> None:
                 await session.commit()
                 return
 
-            # Summary
-            try:
-                note.summary = await summarize(
-                    llm, content=content, source_type="text",
-                    title_hint=note.title,
-                )
-            except Exception as exc:  # noqa: BLE001
-                log.exception("process_text.summarize.failed", note_id=str(note_id))
-                note.summary = None
-                note.error_message = f"summary: {exc}"[:1_000]
+            if note.summary is None:
+                try:
+                    note.summary = await summarize(
+                        llm, content=content, source_type=note.source_type,
+                        title_hint=note.title,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    log.exception("process_text.summarize.failed", note_id=str(note_id))
+                    note.error_message = f"summary: {exc}"[:1_000]
 
-            # Tags
             try:
                 await suggest_and_apply_tags(
                     session, llm,
@@ -81,8 +88,8 @@ async def _process_text_note(note_id: UUID) -> None:
             except Exception:  # noqa: BLE001
                 log.exception("process_text.tagging.failed", note_id=str(note_id))
 
-            # Chunks + embeddings
             chunks_in = split_into_chunks(content)
+            chunk_count = len(chunks_in)
             if chunks_in:
                 vectors = await embedder.embed([c.content for c in chunks_in])
                 chunk_rows: list[Chunk] = []
@@ -109,8 +116,14 @@ async def _process_text_note(note_id: UUID) -> None:
             note.status = NoteStatus.ready.value
             await session.commit()
 
-        await publish_note_ready(redis, user_id=note.user_id, note_id=note.id)
-        log.info("process_text.ok", note_id=str(note_id), chunks=len(chunks_in))
+        if user_id is not None and tg_user_id is not None:
+            await publish_note_ready(
+                redis,
+                user_id=user_id,
+                tg_user_id=tg_user_id,
+                note_id=note_id,
+            )
+        log.info("process_text.ok", note_id=str(note_id), chunks=chunk_count)
     finally:
         for component in (llm, embedder, qdrant):
             close = getattr(component, "aclose", None)

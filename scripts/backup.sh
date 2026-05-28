@@ -4,6 +4,15 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# Source .env so MINIO_SECRET_KEY/POSTGRES_USER/etc. are available to
+# this script and the docker compose exec'd processes below.
+if [[ -f .env ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    . .env
+    set +a
+fi
+
 STAMP="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
 OUT="$ROOT/backups/$STAMP"
 mkdir -p "$OUT"
@@ -20,9 +29,13 @@ SNAPSHOT_NAME=$(echo "$SNAPSHOT_RESP" | python3 -c "import sys,json; print(json.
 docker compose cp "qdrant:/qdrant/snapshots/mnemo_chunks/$SNAPSHOT_NAME" "$OUT/qdrant.snapshot"
 
 echo "→ MinIO mirror"
-docker compose exec -T minio mc alias set local http://localhost:9000 \
-    "${MINIO_ACCESS_KEY:-mnemo}" "${MINIO_SECRET_KEY}" >/dev/null
-docker compose cp "minio:/data/${MINIO_BUCKET:-mnemo-blobs}" "$OUT/minio_bucket" || true
+if [[ -z "${MINIO_SECRET_KEY:-}" ]]; then
+    echo "  ! MINIO_SECRET_KEY not set in environment or .env — skipping MinIO." >&2
+else
+    docker compose exec -T minio mc alias set local http://localhost:9000 \
+        "${MINIO_ACCESS_KEY:-mnemo}" "${MINIO_SECRET_KEY}" >/dev/null
+    docker compose cp "minio:/data/${MINIO_BUCKET:-mnemo-blobs}" "$OUT/minio_bucket" || true
+fi
 
 echo "→ Done: $OUT"
 du -sh "$OUT"

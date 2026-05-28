@@ -50,13 +50,12 @@ def make_embedder(settings: Settings) -> Embedder:
             dim=settings.embed_dim,
         )
     if settings.embed_provider == "openai":
-        if not settings.openrouter_api_key:
+        if not settings.openai_api_key:
             raise MnemoError(
-                "MNEMO_EMBED_PROVIDER=openai requires OPENAI_API_KEY "
-                "(reusing OPENROUTER_API_KEY is unsupported)"
+                "MNEMO_EMBED_PROVIDER=openai requires OPENAI_API_KEY"
             )
         return OpenAIEmbedder(
-            api_key=settings.openrouter_api_key.get_secret_value(),
+            api_key=settings.openai_api_key.get_secret_value(),
             model=settings.embed_model,
             dim=settings.embed_dim,
         )

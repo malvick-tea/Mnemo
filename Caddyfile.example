@@ -26,6 +26,17 @@
         }
     }
 
+    # ── Admin webapp ────────────────────────────────────────────────────────
+    handle_path /admin/* {
+        basicauth {
+            {$N8N_BASIC_AUTH_USER} {$N8N_BASIC_AUTH_PASSWORD_HASH}
+        }
+        reverse_proxy webapp:8080 {
+            header_up Host {host}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
     # Everything else: return 404. Mnemo's Core API is intentionally NOT
     # exposed to the internet.
     respond 404

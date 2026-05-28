@@ -150,6 +150,13 @@ class ApiClient:
     async def get_note(self, tg_user_id: int, note_id: UUID) -> dict[str, Any]:
         return await self._request(tg_user_id, "GET", f"/v1/notes/{note_id}")
 
+    async def generate_anki(
+        self, tg_user_id: int, note_id: UUID
+    ) -> dict[str, Any]:
+        return await self._request(
+            tg_user_id, "POST", f"/v1/notes/{note_id}/anki"
+        )
+
     async def _request(
         self, tg_user_id: int, method: str, path: str, **kwargs: Any
     ) -> dict[str, Any]:

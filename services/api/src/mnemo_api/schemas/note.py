@@ -38,3 +38,16 @@ class NotePatch(BaseModel):
     processed_content: str | None = None
     add_tags: list[str] = Field(default_factory=list)
     remove_tags: list[str] = Field(default_factory=list)
+
+
+class AnkiCardOut(BaseModel):
+    type: Literal["basic", "cloze"]
+    front: str | None = None
+    back: str | None = None
+    text: str | None = None
+
+
+class AnkiCardsOut(BaseModel):
+    note_id: UUID
+    cards: list[AnkiCardOut]
+    model_used: str

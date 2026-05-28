@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Mnemo · Recent{% endblock %}
+{% block content %}
+
+<section>
+  <h2>Recent notes</h2>
+  {% for n in notes %}
+    <div class="card">
+      <h3><a href="/notes/{{ n.id }}">{{ n.title or "(untitled)" }}</a></h3>
+      <div class="meta">
+        {{ n.source_type }} · {{ n.created_at.strftime("%Y-%m-%d %H:%M") }} ·
+        status: {{ n.status }}
+      </div>
+      {% if n.summary %}<p>{{ n.summary[:280] }}{% if n.summary|length > 280 %}…{% endif %}</p>{% endif %}
+    </div>
+  {% else %}
+    <p>No notes yet.</p>
+  {% endfor %}
+</section>
+
+<section>
+  <h2>Recent queries</h2>
+  {% for q in queries %}
+    <div class="card">
+      <div class="meta">{{ q.created_at.strftime("%Y-%m-%d %H:%M") }} · {{ q.latency_ms or "—" }} ms</div>
+      <strong>{{ q.query_text }}</strong>
+      {% if q.response_text %}<p>{{ q.response_text[:280] }}{% if q.response_text|length > 280 %}…{% endif %}</p>{% endif %}
+    </div>
+  {% else %}
+    <p>No queries logged.</p>
+  {% endfor %}
+</section>
+
+<section>
+  <h2>Tags</h2>
+  {% for name, count in tags %}
+    <span class="tag">{{ name }} · {{ count }}</span>
+  {% else %}
+    <p>No tags yet.</p>
+  {% endfor %}
+</section>
+
+{% endblock %}

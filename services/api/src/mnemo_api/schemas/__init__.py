@@ -7,7 +7,13 @@ from mnemo_api.schemas.capture import (
     CaptureURLIn,
     ForwardMetadata,
 )
-from mnemo_api.schemas.note import NoteOut, NotePatch, TagOut
+from mnemo_api.schemas.note import (
+    AnkiCardOut,
+    AnkiCardsOut,
+    NoteOut,
+    NotePatch,
+    TagOut,
+)
 from mnemo_api.schemas.query import (
     Citation,
     QueryFeedbackIn,
@@ -20,6 +26,8 @@ from mnemo_api.schemas.webhooks import (
 )
 
 __all__ = [
+    "AnkiCardOut",
+    "AnkiCardsOut",
     "CaptureForwardIn",
     "CaptureResponse",
     "CaptureTextIn",

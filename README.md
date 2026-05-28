@@ -70,9 +70,11 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full picture.
 
 ## Project status
 
-🚧 **Phase 1 + 2 (MVP)** — all capture types wired (text · URL · voice ·
-photo · document · forward) + RAG. Integrations (Notion/Obsidian/Anki) and
-the admin webapp land in Phase 3 / Phase 4. See [PLAN.md](PLAN.md).
+🚧 **MVP feature-complete (Phase 1-4)** — all capture types (text · URL ·
+voice · photo · document · forward), hybrid RAG, daily digest cron,
+Notion sync, Obsidian export, Anki card generation, and a read-only
+admin webapp at `/admin/`. Polish items (screenshots, threat model,
+VPS walkthrough) remain. See [PLAN.md](PLAN.md).
 
 ## Documentation
 

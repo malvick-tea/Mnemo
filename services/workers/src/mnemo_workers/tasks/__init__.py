@@ -4,8 +4,11 @@
 from mnemo_workers import broker  # noqa: F401
 
 from mnemo_workers.tasks import (  # noqa: F401  (side-effect imports)
+    digest,
     embed,
     n8n,
+    notion_sync,
+    obsidian_export,
     process_document,
     process_photo,
     process_text,

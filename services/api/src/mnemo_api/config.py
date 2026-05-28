@@ -66,6 +66,7 @@ class Settings(BaseSettings):
     openrouter_base_url: str = Field(
         default="https://openrouter.ai/api/v1", alias="OPENROUTER_BASE_URL"
     )
+    openai_api_key: SecretStr | None = Field(default=None, alias="OPENAI_API_KEY")
     ollama_base_url: str = Field(
         default="http://host.docker.internal:11434", alias="OLLAMA_BASE_URL"
     )

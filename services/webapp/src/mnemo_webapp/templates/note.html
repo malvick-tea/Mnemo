@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ note.title or "(untitled)" }} · Mnemo{% endblock %}
+{% block content %}
+
+<article>
+  <h2>{{ note.title or "(untitled)" }}</h2>
+  <div class="meta">
+    {{ note.source_type }} · captured {{ note.captured_at.strftime("%Y-%m-%d %H:%M UTC") }}
+    {% if note.source_url %}· <a href="{{ note.source_url }}">source</a>{% endif %}
+    · status: {{ note.status }}
+  </div>
+  {% if tags %}
+    <p>
+      {% for t in tags %}<span class="tag">#{{ t }}</span>{% endfor %}
+    </p>
+  {% endif %}
+
+  {% if note.summary %}
+    <h3>Summary</h3>
+    <p>{{ note.summary }}</p>
+  {% endif %}
+
+  <h3>Content</h3>
+  <pre>{{ note.processed_content or note.raw_content or "(empty)" }}</pre>
+
+  {% if note.error_message %}
+    <h3>Error</h3>
+    <pre>{{ note.error_message }}</pre>
+  {% endif %}
+</article>
+
+{% endblock %}
