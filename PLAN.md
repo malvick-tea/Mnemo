@@ -92,9 +92,14 @@ ship as inactive scaffolds for users who prefer the visual editor.
       tag cloud. See `services/webapp/`.
 - [x] Backup/restore scripts (source `.env`, MinIO skip guard)
 - [x] CI: lint + test + build images (`.github/workflows/`)
-- [ ] README screenshots via `scripts/seed_demo.py`
-- [ ] `docs/setup-vps.md` walkthrough — currently a placeholder
-- [ ] Threat model in `SECURITY.md` — currently a placeholder
+- [x] `docs/setup-vps.md` walkthrough — full Ubuntu 24.04 walkthrough
+      (server prep, Docker, DNS, bootstrap, sanity check, updates,
+      backups via cron, troubleshooting table)
+- [x] Threat model in `SECURITY.md` — per-surface table shipped in
+      Phase 5 (`1ac0f17`)
+- [ ] README screenshots via `scripts/seed_demo.py` — script generates
+      a demo dataset; actually capturing the screenshots requires a
+      running stack and is an **operator/manual** step, not code
 
 ## Phase 5 — Production hardening
 
