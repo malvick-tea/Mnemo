@@ -18,6 +18,7 @@ from mnemo_api.auth import verify_webhook_signature
 from mnemo_api.db import get_session
 from mnemo_api.exceptions import AuthError
 from mnemo_api.logging import get_logger
+from mnemo_api.metrics import webhook_total
 from mnemo_api.models import IdempotencyKey, Note, NoteStatus
 from mnemo_api.schemas import N8NNoteFailedIn, N8NNoteReadyIn
 from mnemo_api.services.queue import enqueue
@@ -50,33 +51,47 @@ async def n8n_webhook(
     x_timestamp: str | None = Header(default=None, alias="X-Mnemo-Timestamp"),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> dict[str, Any]:
-    body, idem = await _verify_and_dedupe(
-        request, x_signature, x_timestamp, idempotency_key
-    )
+    try:
+        body, idem = await _verify_and_dedupe(
+            request, x_signature, x_timestamp, idempotency_key
+        )
+    except HTTPException:
+        webhook_total.labels(event=event, outcome="rejected").inc()
+        raise
 
     async for session in get_session():
         existing = await session.get(IdempotencyKey, idem)
         if existing is not None:
+            webhook_total.labels(event=event, outcome="duplicate").inc()
             return existing.response_body or {"status": "duplicate"}
 
         try:
             payload = json.loads(body.decode("utf-8"))
         except json.JSONDecodeError as exc:
+            webhook_total.labels(event=event, outcome="rejected").inc()
             raise HTTPException(400, "Invalid JSON") from exc
 
         redis = request.app.state.redis
 
-        if event == "note-ready":
-            ready = N8NNoteReadyIn.model_validate(payload)
-            response = await _handle_note_ready(session, redis, ready)
-        elif event == "note-failed":
-            failed = N8NNoteFailedIn.model_validate(payload)
-            response = await _handle_note_failed(session, failed)
-        else:
-            raise HTTPException(404, f"Unknown event '{event}'")
+        try:
+            if event == "note-ready":
+                ready = N8NNoteReadyIn.model_validate(payload)
+                response = await _handle_note_ready(session, redis, ready)
+            elif event == "note-failed":
+                failed = N8NNoteFailedIn.model_validate(payload)
+                response = await _handle_note_failed(session, failed)
+            else:
+                webhook_total.labels(event=event, outcome="rejected").inc()
+                raise HTTPException(404, f"Unknown event '{event}'")
+        except HTTPException:
+            raise
+        except Exception:
+            webhook_total.labels(event=event, outcome="error").inc()
+            raise
 
         session.add(IdempotencyKey(key=idem, response_body=response))
         await session.commit()
+        webhook_total.labels(event=event, outcome="accepted").inc()
         return response
 
     raise HTTPException(500, "Session unavailable")  # unreachable

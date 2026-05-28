@@ -5,6 +5,22 @@
 {$MNEMO_DOMAIN} {
     encode gzip zstd
 
+    # ── Hardening: response headers applied to every route ─────────────────
+    header {
+        # HSTS — telling browsers to remember HTTPS-only for a year.
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        # Stops the page being framed by other origins (clickjacking).
+        X-Frame-Options "DENY"
+        # Stops content-type sniffing.
+        X-Content-Type-Options "nosniff"
+        # Conservative referrer policy.
+        Referrer-Policy "strict-origin-when-cross-origin"
+        # Lock down powerful browser features we don't use.
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        # Hide server fingerprint.
+        -Server
+    }
+
     # ── Telegram webhook ────────────────────────────────────────────────────
     # The path is a per-install secret (TELEGRAM_WEBHOOK_PATH). Anything that
     # doesn't match the secret prefix is rejected before reaching the bot.

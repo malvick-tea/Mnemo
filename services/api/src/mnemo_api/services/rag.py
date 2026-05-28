@@ -19,6 +19,7 @@ from mnemo_api.config import get_settings
 from mnemo_api.llm import LLMClient, Message, render_prompt
 from mnemo_api.llm.base import Embedder
 from mnemo_api.logging import get_logger
+from mnemo_api.metrics import query_latency_seconds, query_total, search_hits
 from mnemo_api.models import Note, Query
 from mnemo_api.services.search import SearchHit, hybrid_search
 
@@ -60,13 +61,20 @@ async def answer_question(
     settings = get_settings()
     t0 = time.perf_counter()
 
-    hits = await hybrid_search(
-        session=session, qdrant=qdrant, embedder=embedder,
-        user_id=user_id, query=query, top_k=top_k,
-    )
+    try:
+        hits = await hybrid_search(
+            session=session, qdrant=qdrant, embedder=embedder,
+            user_id=user_id, query=query, top_k=top_k,
+        )
+    except Exception:
+        query_total.labels(outcome="error").inc()
+        raise
+    search_hits.labels(retriever="fused").observe(len(hits))
 
     if not hits:
         latency_ms = int((time.perf_counter() - t0) * 1000)
+        query_latency_seconds.observe(latency_ms / 1000.0)
+        query_total.labels(outcome="empty").inc()
         out = RagResult(
             query_id=UUID(int=0),
             answer=(
@@ -92,21 +100,27 @@ async def answer_question(
         for h in hits
     ]
     prompt, fp = render_prompt("rag_answer_v1", query=query, snippets=snippets)
-    completion = await llm.chat(
-        [
-            Message(role="system", content="You are Mnemo, a careful retrieval assistant."),
-            Message(role="user", content=prompt),
-        ],
-        model=settings.model_rag,
-        max_tokens=900,
-        temperature=0.2,
-        prompt_fingerprint=fp,
-    )
+    try:
+        completion = await llm.chat(
+            [
+                Message(role="system", content="You are Mnemo, a careful retrieval assistant."),
+                Message(role="user", content=prompt),
+            ],
+            model=settings.model_rag,
+            max_tokens=900,
+            temperature=0.2,
+            prompt_fingerprint=fp,
+        )
+    except Exception:
+        query_total.labels(outcome="error").inc()
+        raise
 
     cited_shorts = set(_CITATION_RE.findall(completion.text))
     citations = await _build_citations(session, hits, cited_shorts)
 
     latency_ms = int((time.perf_counter() - t0) * 1000)
+    query_latency_seconds.observe(latency_ms / 1000.0)
+    query_total.labels(outcome="ok").inc()
     out = RagResult(
         query_id=UUID(int=0),
         answer=completion.text,

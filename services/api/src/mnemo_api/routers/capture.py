@@ -15,6 +15,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from mnemo_api.config import get_settings
 from mnemo_api.deps import CurrentUser, MinioDep, RedisDep, SessionDep
+from mnemo_api.metrics import capture_bytes, capture_total
 from mnemo_api.schemas import (
     CaptureForwardIn,
     CaptureResponse,
@@ -33,14 +34,20 @@ async def capture_text(
     session: SessionDep,
     redis: RedisDep,
 ) -> CaptureResponse:
-    note = await capture_svc.create_text_note(
-        session, redis,
-        user=user,
-        content=payload.content,
-        captured_at=payload.captured_at,
-        source_metadata=payload.source_metadata,
-    )
-    await session.commit()
+    try:
+        note = await capture_svc.create_text_note(
+            session, redis,
+            user=user,
+            content=payload.content,
+            captured_at=payload.captured_at,
+            source_metadata=payload.source_metadata,
+        )
+        await session.commit()
+    except Exception:
+        capture_total.labels(source_type="text", outcome="error").inc()
+        raise
+    capture_total.labels(source_type="text", outcome="ok").inc()
+    capture_bytes.labels(source_type="text").inc(len(payload.content))
     return CaptureResponse(note_id=note.id, status=note.status)  # type: ignore[arg-type]
 
 
@@ -51,14 +58,19 @@ async def capture_url(
     session: SessionDep,
     redis: RedisDep,
 ) -> CaptureResponse:
-    note = await capture_svc.create_url_note(
-        session, redis,
-        user=user,
-        url=str(payload.url),
-        captured_at=payload.captured_at,
-        source_metadata=payload.source_metadata,
-    )
-    await session.commit()
+    try:
+        note = await capture_svc.create_url_note(
+            session, redis,
+            user=user,
+            url=str(payload.url),
+            captured_at=payload.captured_at,
+            source_metadata=payload.source_metadata,
+        )
+        await session.commit()
+    except Exception:
+        capture_total.labels(source_type="url", outcome="error").inc()
+        raise
+    capture_total.labels(source_type="url", outcome="ok").inc()
     return CaptureResponse(note_id=note.id, status=note.status)  # type: ignore[arg-type]
 
 
@@ -72,17 +84,27 @@ async def capture_voice(
     captured_at: datetime = Form(default_factory=lambda: datetime.now(UTC)),
 ) -> CaptureResponse:
     settings = get_settings()
-    body = await _read_capped(file, settings.max_upload_mb)
+    try:
+        body = await _read_capped(file, settings.max_upload_mb)
+    except HTTPException:
+        capture_total.labels(source_type="voice", outcome="rejected").inc()
+        raise
     blob_key = _build_blob_key(user.id, file.filename or "voice.ogg")
-    _put_object(minio, settings.minio_bucket, blob_key, body, file.content_type)
-    note = await capture_svc.create_voice_note(
-        session, redis,
-        user=user,
-        blob_key=blob_key,
-        captured_at=captured_at,
-        source_metadata={"size_bytes": len(body), "mime": file.content_type},
-    )
-    await session.commit()
+    try:
+        _put_object(minio, settings.minio_bucket, blob_key, body, file.content_type)
+        note = await capture_svc.create_voice_note(
+            session, redis,
+            user=user,
+            blob_key=blob_key,
+            captured_at=captured_at,
+            source_metadata={"size_bytes": len(body), "mime": file.content_type},
+        )
+        await session.commit()
+    except Exception:
+        capture_total.labels(source_type="voice", outcome="error").inc()
+        raise
+    capture_total.labels(source_type="voice", outcome="ok").inc()
+    capture_bytes.labels(source_type="voice").inc(len(body))
     return CaptureResponse(note_id=note.id, status=note.status)  # type: ignore[arg-type]
 
 
@@ -97,21 +119,32 @@ async def capture_photo(
     captured_at: datetime = Form(default_factory=lambda: datetime.now(UTC)),
 ) -> CaptureResponse:
     settings = get_settings()
-    body = await _read_capped(file, settings.max_upload_mb)
+    try:
+        body = await _read_capped(file, settings.max_upload_mb)
+    except HTTPException:
+        capture_total.labels(source_type="photo", outcome="rejected").inc()
+        raise
     mime = (file.content_type or "image/jpeg").lower()
     if not mime.startswith("image/"):
+        capture_total.labels(source_type="photo", outcome="rejected").inc()
         raise HTTPException(415, f"Not an image MIME type: {mime}")
     blob_key = _build_blob_key(user.id, file.filename or "photo.jpg")
-    _put_object(minio, settings.minio_bucket, blob_key, body, mime)
-    note = await capture_svc.create_photo_note(
-        session, redis,
-        user=user,
-        blob_key=blob_key,
-        caption=caption,
-        captured_at=captured_at,
-        source_metadata={"size_bytes": len(body), "mime": mime},
-    )
-    await session.commit()
+    try:
+        _put_object(minio, settings.minio_bucket, blob_key, body, mime)
+        note = await capture_svc.create_photo_note(
+            session, redis,
+            user=user,
+            blob_key=blob_key,
+            caption=caption,
+            captured_at=captured_at,
+            source_metadata={"size_bytes": len(body), "mime": mime},
+        )
+        await session.commit()
+    except Exception:
+        capture_total.labels(source_type="photo", outcome="error").inc()
+        raise
+    capture_total.labels(source_type="photo", outcome="ok").inc()
+    capture_bytes.labels(source_type="photo").inc(len(body))
     return CaptureResponse(note_id=note.id, status=note.status)  # type: ignore[arg-type]
 
 
@@ -135,25 +168,36 @@ async def capture_document(
     captured_at: datetime = Form(default_factory=lambda: datetime.now(UTC)),
 ) -> CaptureResponse:
     settings = get_settings()
-    body = await _read_capped(file, settings.max_upload_mb)
+    try:
+        body = await _read_capped(file, settings.max_upload_mb)
+    except HTTPException:
+        capture_total.labels(source_type="document", outcome="rejected").inc()
+        raise
     mime = (file.content_type or "application/octet-stream").lower()
     filename = file.filename or "document"
     if mime not in _ALLOWED_DOC_MIMES and not _has_known_ext(filename):
+        capture_total.labels(source_type="document", outcome="rejected").inc()
         raise HTTPException(
             415, f"Unsupported document type: {mime} ({filename})"
         )
     blob_key = _build_blob_key(user.id, filename)
-    _put_object(minio, settings.minio_bucket, blob_key, body, mime)
-    note = await capture_svc.create_document_note(
-        session, redis,
-        user=user,
-        blob_key=blob_key,
-        filename=filename,
-        mime=mime,
-        captured_at=captured_at,
-        source_metadata={"size_bytes": len(body)},
-    )
-    await session.commit()
+    try:
+        _put_object(minio, settings.minio_bucket, blob_key, body, mime)
+        note = await capture_svc.create_document_note(
+            session, redis,
+            user=user,
+            blob_key=blob_key,
+            filename=filename,
+            mime=mime,
+            captured_at=captured_at,
+            source_metadata={"size_bytes": len(body)},
+        )
+        await session.commit()
+    except Exception:
+        capture_total.labels(source_type="document", outcome="error").inc()
+        raise
+    capture_total.labels(source_type="document", outcome="ok").inc()
+    capture_bytes.labels(source_type="document").inc(len(body))
     return CaptureResponse(note_id=note.id, status=note.status)  # type: ignore[arg-type]
 
 
@@ -165,15 +209,21 @@ async def capture_forward(
     redis: RedisDep,
 ) -> CaptureResponse:
     forward_meta = payload.forward.model_dump(mode="json", exclude_none=True)
-    note = await capture_svc.create_forward_note(
-        session, redis,
-        user=user,
-        content=payload.content,
-        forward_metadata=forward_meta,
-        captured_at=payload.captured_at,
-        source_metadata=payload.source_metadata,
-    )
-    await session.commit()
+    try:
+        note = await capture_svc.create_forward_note(
+            session, redis,
+            user=user,
+            content=payload.content,
+            forward_metadata=forward_meta,
+            captured_at=payload.captured_at,
+            source_metadata=payload.source_metadata,
+        )
+        await session.commit()
+    except Exception:
+        capture_total.labels(source_type="forward", outcome="error").inc()
+        raise
+    capture_total.labels(source_type="forward", outcome="ok").inc()
+    capture_bytes.labels(source_type="forward").inc(len(payload.content))
     return CaptureResponse(note_id=note.id, status=note.status)  # type: ignore[arg-type]
 
 
@@ -208,9 +258,6 @@ def _put_object(
     body: bytes,
     content_type: str | None,
 ) -> None:
-    # minio is a Minio instance; typing as `object` here so the signature
-    # works whether or not the runtime client is the real Minio class
-    # (tests can pass a stub).
     minio.put_object(  # type: ignore[attr-defined]
         bucket,
         key,

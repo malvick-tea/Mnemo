@@ -16,3 +16,4 @@ os.environ.setdefault("POSTGRES_DB", "mnemo_test")
 os.environ.setdefault("MINIO_ACCESS_KEY", "mnemo")
 os.environ.setdefault("MINIO_SECRET_KEY", "mnemo_secret")
 os.environ.setdefault("MNEMO_LLM_PROVIDER", "ollama")  # no API key required
+os.environ.setdefault("MNEMO_METRICS_ENABLED", "false")

@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from uuid import UUID
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, select, text
 
 from mnemo_api.db import session_factory
 from mnemo_api.models import Note, NoteTag, Query, Tag
@@ -22,7 +23,20 @@ app = FastAPI(title="Mnemo Admin", version=__version__)
 
 @app.get("/healthz")
 async def healthz() -> dict[str, str]:
+    """Liveness only: process is up. DB is checked by /readyz."""
     return {"status": "ok"}
+
+
+@app.get("/readyz")
+async def readyz() -> dict[str, str]:
+    """Readiness: DB is reachable."""
+    try:
+        async with session_factory()() as session:
+            await session.execute(text("SELECT 1"))
+    except Exception as exc:  # noqa: BLE001
+        from fastapi import HTTPException
+        raise HTTPException(503, f"postgres unavailable: {exc}") from exc
+    return {"status": "ready"}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -61,12 +75,11 @@ async def index(request: Request) -> HTMLResponse:
 
 @app.get("/notes/{note_id}", response_class=HTMLResponse)
 async def note_detail(request: Request, note_id: str) -> HTMLResponse:
+    try:
+        uid = UUID(note_id)
+    except ValueError:
+        return HTMLResponse("Not found", status_code=404)
     async with session_factory()() as session:
-        from uuid import UUID
-        try:
-            uid = UUID(note_id)
-        except ValueError:
-            return HTMLResponse("Not found", status_code=404)
         note = await session.get(Note, uid)
         if note is None:
             return HTMLResponse("Not found", status_code=404)

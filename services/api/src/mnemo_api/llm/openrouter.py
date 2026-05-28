@@ -8,6 +8,7 @@ universally supported — for embeddings prefer Ollama (bge-m3) or OpenAI.
 from __future__ import annotations
 
 import base64
+import time
 from typing import Any, Literal
 
 import httpx
@@ -21,8 +22,11 @@ from tenacity import (
 from mnemo_api.exceptions import ProviderError
 from mnemo_api.llm.base import CompletionResult, Message
 from mnemo_api.logging import get_logger
+from mnemo_api.metrics import llm_call_seconds, llm_errors_total, llm_tokens_total
 
 log = get_logger(__name__)
+
+_PROVIDER = "openrouter"
 
 
 class OpenRouterClient:
@@ -105,6 +109,7 @@ class OpenRouterClient:
             retry=retry_if_exception_type((httpx.HTTPError,)),
             reraise=True,
         )
+        t0 = time.perf_counter()
         try:
             async for attempt in retrying:
                 with attempt:
@@ -116,16 +121,25 @@ class OpenRouterClient:
                     resp.raise_for_status()
                     data = resp.json()
         except httpx.HTTPError as exc:
+            llm_errors_total.labels(provider=_PROVIDER).inc()
+            llm_call_seconds.labels(provider=_PROVIDER).observe(time.perf_counter() - t0)
             log.error("openrouter.chat.failed", model=model, error=str(exc))
             raise ProviderError(f"OpenRouter call failed: {exc}") from exc
 
+        llm_call_seconds.labels(provider=_PROVIDER).observe(time.perf_counter() - t0)
         choice = data["choices"][0]
         usage = data.get("usage", {})
+        prompt_tokens = int(usage.get("prompt_tokens", 0))
+        completion_tokens = int(usage.get("completion_tokens", 0))
+        if prompt_tokens:
+            llm_tokens_total.labels(direction="prompt", provider=_PROVIDER).inc(prompt_tokens)
+        if completion_tokens:
+            llm_tokens_total.labels(direction="completion", provider=_PROVIDER).inc(completion_tokens)
         return CompletionResult(
             text=choice["message"]["content"] or "",
             model=data.get("model", model),
-            prompt_tokens=int(usage.get("prompt_tokens", 0)),
-            completion_tokens=int(usage.get("completion_tokens", 0)),
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
             prompt_fingerprint=prompt_fingerprint,
         )
 

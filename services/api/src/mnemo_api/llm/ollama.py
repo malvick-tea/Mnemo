@@ -6,6 +6,7 @@ Reaches Ollama via HTTP. On Mac/Windows the typical compose-internal URL is
 
 from __future__ import annotations
 
+import time
 from typing import Any, Literal
 
 import httpx
@@ -19,8 +20,11 @@ from tenacity import (
 from mnemo_api.exceptions import ProviderError
 from mnemo_api.llm.base import CompletionResult, Message
 from mnemo_api.logging import get_logger
+from mnemo_api.metrics import llm_call_seconds, llm_errors_total, llm_tokens_total
 
 log = get_logger(__name__)
+
+_PROVIDER = "ollama"
 
 
 class OllamaClient:
@@ -49,6 +53,7 @@ class OllamaClient:
         if response_format == "json":
             payload["format"] = "json"
 
+        t0 = time.perf_counter()
         try:
             async for attempt in AsyncRetrying(
                 stop=stop_after_attempt(3),
@@ -61,14 +66,23 @@ class OllamaClient:
                     resp.raise_for_status()
                     data = resp.json()
         except httpx.HTTPError as exc:
+            llm_errors_total.labels(provider=_PROVIDER).inc()
+            llm_call_seconds.labels(provider=_PROVIDER).observe(time.perf_counter() - t0)
             log.error("ollama.chat.failed", model=model, error=str(exc))
             raise ProviderError(f"Ollama call failed: {exc}") from exc
 
+        llm_call_seconds.labels(provider=_PROVIDER).observe(time.perf_counter() - t0)
+        prompt_tokens = int(data.get("prompt_eval_count", 0))
+        completion_tokens = int(data.get("eval_count", 0))
+        if prompt_tokens:
+            llm_tokens_total.labels(direction="prompt", provider=_PROVIDER).inc(prompt_tokens)
+        if completion_tokens:
+            llm_tokens_total.labels(direction="completion", provider=_PROVIDER).inc(completion_tokens)
         return CompletionResult(
             text=data.get("message", {}).get("content", ""),
             model=model,
-            prompt_tokens=int(data.get("prompt_eval_count", 0)),
-            completion_tokens=int(data.get("eval_count", 0)),
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
             prompt_fingerprint=prompt_fingerprint,
         )
 

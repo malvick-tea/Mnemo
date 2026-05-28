@@ -22,7 +22,11 @@ from mnemo_api.config import get_settings
 from mnemo_api.exceptions import MnemoError
 from mnemo_api.llm import make_embedder, make_llm
 from mnemo_api.logging import configure_logging, get_logger
-from mnemo_api.middlewares import AccessLogMiddleware, CorrelationIdMiddleware
+from mnemo_api.middlewares import (
+    AccessLogMiddleware,
+    CorrelationIdMiddleware,
+    RateLimitMiddleware,
+)
 from mnemo_api.qdrant_setup import ensure_collection
 from mnemo_api.routers import (
     capture,
@@ -100,6 +104,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(CorrelationIdMiddleware)
     app.add_middleware(AccessLogMiddleware)
+    app.add_middleware(RateLimitMiddleware)
 
     @app.exception_handler(MnemoError)
     async def _mnemo_error_handler(_request: object, exc: MnemoError) -> JSONResponse:

@@ -14,3 +14,6 @@ os.environ.setdefault("POSTGRES_DB", "mnemo_test")
 os.environ.setdefault("MINIO_ACCESS_KEY", "mnemo")
 os.environ.setdefault("MINIO_SECRET_KEY", "mnemo_secret")
 os.environ.setdefault("MNEMO_LLM_PROVIDER", "ollama")
+# Don't bind the Prometheus exporter in unit tests — port conflicts
+# when pytest collects worker modules.
+os.environ.setdefault("MNEMO_METRICS_ENABLED", "false")

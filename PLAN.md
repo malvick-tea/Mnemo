@@ -96,6 +96,22 @@ ship as inactive scaffolds for users who prefer the visual editor.
 - [ ] `docs/setup-vps.md` walkthrough — currently a placeholder
 - [ ] Threat model in `SECURITY.md` — currently a placeholder
 
+## Phase 5 — Production hardening
+
+- [x] Prometheus metrics module + wiring (capture, RAG, LLM tokens,
+      worker tasks, queue depth, webhooks) per [ADR-005](docs/decisions/ADR-005-observability.md)
+- [x] API-level rate limit middleware (per JWT-token bucket, exempt
+      `/healthz`/`/readyz`/`/metrics`)
+- [x] Dramatiq broker middleware records `mnemo_worker_task_*` for every
+      actor — future actors are instrumented automatically
+- [x] Workers/dispatcher/scheduler expose `:9101/metrics` via
+      `prometheus_client.start_http_server`
+- [x] Hourly `run_idempotency_cleanup` cron actor purges >24h-old rows
+- [x] Caddy security headers (HSTS, X-Frame-Options, nosniff, etc.)
+- [x] SECURITY.md threat model: per-surface table of threats + mitigations
+- [x] `docs/observability.md` scrape config + dashboard hints
+- [x] Webapp gains real `/readyz` (pings Postgres)
+
 ### Bug fixes shipped alongside Phase 3+4
 
 - `_handle_note_ready` left URL notes stuck in `processing`; now chains
