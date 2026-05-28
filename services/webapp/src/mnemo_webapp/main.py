@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import desc, func, select, text
@@ -34,7 +34,6 @@ async def readyz() -> dict[str, str]:
         async with session_factory()() as session:
             await session.execute(text("SELECT 1"))
     except Exception as exc:  # noqa: BLE001
-        from fastapi import HTTPException
         raise HTTPException(503, f"postgres unavailable: {exc}") from exc
     return {"status": "ready"}
 

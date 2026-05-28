@@ -141,11 +141,18 @@ async def _handle_digest(bot: Bot, data: dict[str, Any]) -> None:
 
 
 def _format_note(note: dict[str, Any]) -> str:
+    status = note.get("status") or "ready"
     title = note.get("title") or "(untitled)"
     summary = note.get("summary") or note.get("processed_content") or ""
     tags = note.get("tags") or []
     tag_line = " ".join(f"#{t['name']}" for t in tags) if tags else ""
-    out = f"✅ *{title}*\n\n{summary}"
+
+    if status == "failed":
+        err = note.get("error_message") or "Unknown error."
+        return f"❌ *{title}*\n\nProcessing failed: {err}"
+
+    icon = "✅" if status == "ready" else "⏳"
+    out = f"{icon} *{title}*\n\n{summary}"
     if tag_line:
         out += f"\n\n{tag_line}"
     return out

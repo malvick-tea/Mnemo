@@ -6,6 +6,10 @@ Triggered by the API via Redis enqueue. Pipeline:
 We keep everything in this single actor so a single retry policy applies
 to the whole pipeline. Splitting it into pipelined actors is straightforward
 once we hit performance issues — Dramatiq's `pipe` middleware is wired up.
+
+The actor always publishes a ``note.ready.<user_id>`` event in `finally`,
+regardless of outcome, so the bot's "📝 Saving…" placeholder gets edited
+to either the final note view or a "❌ failed" message — never stuck.
 """
 
 from __future__ import annotations
@@ -81,8 +85,9 @@ async def _process_text_note(note_id: UUID) -> None:
                     log.exception("process_text.summarize.failed", note_id=str(note_id))
                     note.error_message = f"summary: {exc}"[:1_000]
 
+            applied_tags: list[str] = []
             try:
-                await suggest_and_apply_tags(
+                applied_tags = await suggest_and_apply_tags(
                     session, llm,
                     note_id=note.id, user_id=note.user_id, content=content,
                 )
@@ -112,21 +117,29 @@ async def _process_text_note(note_id: UUID) -> None:
                     note=note,
                     chunks=chunk_rows,
                     vectors=vectors,
+                    tags=applied_tags,
                 )
 
             note.status = NoteStatus.ready.value
             note.processed_at = datetime.now(UTC)
             await session.commit()
-
-        if user_id is not None and tg_user_id is not None:
-            await publish_note_ready(
-                redis,
-                user_id=user_id,
-                tg_user_id=tg_user_id,
-                note_id=note_id,
-            )
         log.info("process_text.ok", note_id=str(note_id), chunks=chunk_count)
     finally:
+        # Always notify the bot so the placeholder message gets edited —
+        # whether we end in `ready`, `failed`, or even mid-exception, so
+        # the user never sees a permanently stuck "📝 Saving…" message.
+        if user_id is not None and tg_user_id is not None:
+            try:
+                await publish_note_ready(
+                    redis,
+                    user_id=user_id,
+                    tg_user_id=tg_user_id,
+                    note_id=note_id,
+                )
+            except Exception:  # noqa: BLE001
+                log.exception(
+                    "process_text.publish_failed", note_id=str(note_id)
+                )
         for component in (llm, embedder, qdrant):
             close = getattr(component, "aclose", None)
             if callable(close):

@@ -204,6 +204,7 @@ def _to_dto(note: Note, tags: list[TagOut]) -> NoteOut:
         source_url=note.source_url,
         tags=tags,
         status=note.status,
+        error_message=note.error_message,
         captured_at=note.captured_at,
         created_at=note.created_at,
         processed_at=note.processed_at,

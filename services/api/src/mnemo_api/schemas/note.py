@@ -26,6 +26,7 @@ class NoteOut(BaseModel):
     source_url: str | None
     tags: list[TagOut] = Field(default_factory=list)
     status: str
+    error_message: str | None = None
     captured_at: datetime
     created_at: datetime
     processed_at: datetime | None
