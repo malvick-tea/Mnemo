@@ -18,23 +18,23 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # ── deps layer (cacheable) ──────────────────────────────────────────────────
 COPY pyproject.toml ./
+COPY src ./src
+COPY alembic.ini ./
 RUN uv venv /opt/venv \
+ && uv pip compile pyproject.toml -o /tmp/requirements.txt \
+ && uv pip install --python /opt/venv/bin/python -r /tmp/requirements.txt \
  && uv pip install --python /opt/venv/bin/python -e . --no-deps \
- && uv pip install --python /opt/venv/bin/python -r <(uv pip compile pyproject.toml)
+ && rm /tmp/requirements.txt
 
 # ── dev image ───────────────────────────────────────────────────────────────
 FROM base AS dev
 RUN uv pip install --python /opt/venv/bin/python ".[dev]"
-COPY src ./src
 COPY tests ./tests
-COPY alembic.ini ./
 EXPOSE 8000 9100
 CMD ["uvicorn", "mnemo_api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 # ── prod image ──────────────────────────────────────────────────────────────
 FROM base AS prod
-COPY src ./src
-COPY alembic.ini ./
 RUN useradd --system --uid 10001 --no-create-home mnemo
 USER mnemo
 EXPOSE 8000 9100
