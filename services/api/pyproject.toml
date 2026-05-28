@@ -84,6 +84,7 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 markers = [
     "integration: tests that hit real Postgres/Qdrant/Redis via testcontainers",
     "eval: RAG eval tests; slow",

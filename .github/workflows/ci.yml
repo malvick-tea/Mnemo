@@ -85,7 +85,6 @@ jobs:
       - name: Unit tests
         working-directory: services/${{ matrix.service }}
         env:
-          TELEGRAM_BOT_TOKEN: dummy:dummy
           POSTGRES_USER: mnemo
           POSTGRES_PASSWORD: mnemo
           POSTGRES_DB: mnemo_test
