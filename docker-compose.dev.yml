@@ -41,6 +41,40 @@ services:
     volumes:
       - ./services/workers/src:/app/src
 
+  dispatcher:
+    build:
+      context: .
+      dockerfile: services/workers/Dockerfile
+      target: dev
+    image: mnemo/workers:latest
+    command: uv run python -m mnemo_workers.dispatcher
+    volumes:
+      - ./services/workers/src:/app/src
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: services/workers/Dockerfile
+      target: dev
+    image: mnemo/workers:latest
+    command: uv run python -m mnemo_workers.scheduler
+    volumes:
+      - ./services/workers/src:/app/src
+
+  webapp:
+    build:
+      target: dev
+    command: >
+      uv run uvicorn mnemo_webapp.main:app --host 0.0.0.0 --port 8080
+      --reload --reload-dir /app/src
+    volumes:
+      - ./services/webapp/src:/app/src
+    ports:
+      - "8080:8080"
+    environment:
+      MNEMO_ENV: development
+      MNEMO_LOG_LEVEL: DEBUG
+
   postgres:
     ports:
       - "5432:5432"

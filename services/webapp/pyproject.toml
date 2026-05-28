@@ -14,9 +14,12 @@ dependencies = [
     "pydantic-settings==2.6.1",
     "structlog==24.4.0",
     "pyjwt==2.10.1",
-    # Shared with API for model + crypto re-use.
-    "mnemo-api @ file:///app/../api",
+    # Shared with API. Resolved via [tool.uv.sources] below.
+    "mnemo-api",
 ]
+
+[tool.uv.sources]
+mnemo-api = { path = "../api", editable = true }
 
 [project.optional-dependencies]
 dev = [

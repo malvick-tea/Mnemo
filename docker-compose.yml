@@ -110,8 +110,8 @@ services:
   # ─── Dramatiq workers ──────────────────────────────────────────────────────
   workers:
     build:
-      context: ./services/workers
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/workers/Dockerfile
     image: mnemo/workers:latest
     <<: *default-restart
     logging: *default-logging
@@ -166,6 +166,26 @@ services:
         condition: service_healthy
     command: ["python", "-m", "mnemo_workers.scheduler"]
     mem_limit: 256m
+
+  # ─── Admin webapp (FastAPI + HTMX) ─────────────────────────────────────────
+  webapp:
+    build:
+      context: .
+      dockerfile: services/webapp/Dockerfile
+    image: mnemo/webapp:latest
+    <<: *default-restart
+    logging: *default-logging
+    env_file: .env
+    networks: [web, internal]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   # ─── Postgres ──────────────────────────────────────────────────────────────
   postgres:

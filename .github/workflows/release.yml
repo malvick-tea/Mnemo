@@ -13,7 +13,19 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        service: [api, bot, workers]
+        include:
+          - service: api
+            context: services/api
+            dockerfile: services/api/Dockerfile
+          - service: bot
+            context: services/bot
+            dockerfile: services/bot/Dockerfile
+          - service: workers
+            context: .
+            dockerfile: services/workers/Dockerfile
+          - service: webapp
+            context: .
+            dockerfile: services/webapp/Dockerfile
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -33,7 +45,8 @@ jobs:
             type=raw,value=latest
       - uses: docker/build-push-action@v6
         with:
-          context: services/${{ matrix.service }}
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           target: prod
           push: true
           tags: ${{ steps.meta.outputs.tags }}

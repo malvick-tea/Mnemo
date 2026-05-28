@@ -124,7 +124,7 @@ async def _select_notes(
         .where(
             Note.user_id == user_id,
             Note.status == NoteStatus.ready.value,
-            Note.processed_at >= since if False else Note.created_at >= since,
+            Note.created_at >= since,
         )
         .order_by(Note.created_at)
         .limit(50)  # batch cap; next run picks up the rest

@@ -53,6 +53,7 @@ async def _components() -> Any:
     dp.include_router(handlers.query.router)
     dp.include_router(handlers.digest.router)
     dp.include_router(handlers.anki.router)
+    dp.include_router(handlers.list_views.router)
     dp.include_router(handlers.settings.router)
     dp.include_router(handlers.capture_url.router)
     dp.include_router(handlers.capture_voice.router)

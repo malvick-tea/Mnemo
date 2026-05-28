@@ -25,7 +25,7 @@ Caddy proxies:
 |---|---|---|
 | `POST /telegram/<bot_token_path>` | bot | shared-secret in URL path |
 | `/n8n/*` | n8n UI | HTTP Basic Auth (set in `.env`) |
-| `/admin/*` | webapp | (phase 4) session cookie |
+| `/admin/*` | webapp | HTTP Basic Auth (re-uses the n8n creds in v1) |
 
 The Core API is **not** exposed publicly. Bot and webapp talk to it over the
 internal network with a service JWT.

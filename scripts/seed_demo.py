@@ -11,12 +11,11 @@ from __future__ import annotations
 import asyncio
 import os
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from mnemo_api.config import get_settings
-from mnemo_api.models import Note, NoteStatus, SourceType, Tag, User
+from mnemo_api.models import Note, NoteStatus, NoteTag, SourceType, Tag, User
 
 _FIXTURES = [
     (
@@ -52,13 +51,16 @@ _FIXTURES = [
 async def main() -> None:
     settings = get_settings()
     engine = create_async_engine(settings.postgres_dsn)
-    Session = async_sessionmaker(engine, expire_on_commit=False)
+    session_maker = async_sessionmaker(engine, expire_on_commit=False)
 
     tg_id = int(os.environ.get("DEMO_TG_USER_ID", "100000001"))
-    async with Session() as session:
+    async with session_maker() as session:
         user = User(tg_user_id=tg_id, tg_username="mnemo_demo")
         session.add(user)
         await session.flush()
+
+        # Reuse-or-create tags per name so we link, not duplicate.
+        tag_cache: dict[str, Tag] = {}
 
         cap = datetime.now(UTC) - timedelta(days=2)
         for title, content, summary, tag_names in _FIXTURES:
@@ -76,7 +78,18 @@ async def main() -> None:
             await session.flush()
             cap += timedelta(hours=4)
             for name in tag_names:
-                session.add(Tag(user_id=user.id, name=name))
+                tag = tag_cache.get(name)
+                if tag is None:
+                    tag = Tag(user_id=user.id, name=name)
+                    session.add(tag)
+                    await session.flush()
+                    tag_cache[name] = tag
+                session.add(
+                    NoteTag(
+                        note_id=note.id, tag_id=tag.id,
+                        source="ai", confidence=1.0,
+                    )
+                )
         await session.commit()
     await engine.dispose()
     print(f"seeded {len(_FIXTURES)} notes for tg_user_id={tg_id}")

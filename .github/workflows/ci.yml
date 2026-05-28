@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [api, bot, workers]
+        service: [api, bot, workers, webapp]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
@@ -51,7 +51,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [api, bot, workers]
+        service: [api, bot, workers, webapp]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
@@ -73,6 +73,12 @@ jobs:
           MNEMO_WEBHOOK_HMAC_SECRET: ${{ secrets.CI_HMAC_SECRET || 'y_y_y_y_y_y_y_y_y_y_y_y_y_y_y_y' }}
           MNEMO_ENCRYPTION_KEY: ${{ secrets.CI_ENC_KEY || 'enpaWZua29tZXRyaW5seGd2aGRsanNkanc=' }}
           TELEGRAM_BOT_TOKEN: dummy:dummy
+          POSTGRES_USER: mnemo
+          POSTGRES_PASSWORD: mnemo
+          POSTGRES_DB: mnemo_test
+          MINIO_ACCESS_KEY: mnemo
+          MINIO_SECRET_KEY: mnemo_secret
+          MNEMO_LLM_PROVIDER: ollama
         run: |
           source .venv/bin/activate
           pytest -q -m "not integration and not eval"
@@ -138,14 +144,27 @@ jobs:
     needs: [lint, unit-tests]
     strategy:
       matrix:
-        service: [api, bot, workers]
+        include:
+          - service: api
+            context: services/api
+            dockerfile: services/api/Dockerfile
+          - service: bot
+            context: services/bot
+            dockerfile: services/bot/Dockerfile
+          - service: workers
+            context: .
+            dockerfile: services/workers/Dockerfile
+          - service: webapp
+            context: .
+            dockerfile: services/webapp/Dockerfile
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
       - name: Build ${{ matrix.service }}
         uses: docker/build-push-action@v6
         with:
-          context: services/${{ matrix.service }}
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           target: prod
           push: false
           cache-from: type=gha,scope=${{ matrix.service }}

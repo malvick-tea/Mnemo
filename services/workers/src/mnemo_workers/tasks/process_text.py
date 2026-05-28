@@ -10,6 +10,7 @@ once we hit performance issues — Dramatiq's `pipe` middleware is wired up.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 import dramatiq
@@ -114,6 +115,7 @@ async def _process_text_note(note_id: UUID) -> None:
                 )
 
             note.status = NoteStatus.ready.value
+            note.processed_at = datetime.now(UTC)
             await session.commit()
 
         if user_id is not None and tg_user_id is not None:
