@@ -71,12 +71,17 @@ class Settings(BaseSettings):
         default="http://host.docker.internal:11434", alias="OLLAMA_BASE_URL"
     )
 
+    # Per-job model routing. Defaults reflect the May 2026 frontier:
+    # - summarize/tag: cheap+fast → Gemini 3.5 Flash (Google I/O 2026-05-19)
+    # - rag: quality-critical → Claude Opus 4.7 (Anthropic 2026-04-16)
+    # - vision: 3.75-megapixel native vision in Opus 4.7; reuse it
+    # Swap to anything OpenRouter exposes by changing the env var.
     model_summarize: str = Field(
-        default="google/gemini-2.5-flash", alias="MNEMO_MODEL_SUMMARIZE"
+        default="google/gemini-3.5-flash", alias="MNEMO_MODEL_SUMMARIZE"
     )
-    model_tag: str = Field(default="google/gemini-2.5-flash", alias="MNEMO_MODEL_TAG")
-    model_rag: str = Field(default="anthropic/claude-sonnet-4.6", alias="MNEMO_MODEL_RAG")
-    model_vision: str = Field(default="openai/gpt-4o", alias="MNEMO_MODEL_VISION")
+    model_tag: str = Field(default="google/gemini-3.5-flash", alias="MNEMO_MODEL_TAG")
+    model_rag: str = Field(default="anthropic/claude-opus-4.7", alias="MNEMO_MODEL_RAG")
+    model_vision: str = Field(default="anthropic/claude-opus-4.7", alias="MNEMO_MODEL_VISION")
 
     embed_provider: Literal["ollama", "openai"] = Field(
         default="ollama", alias="MNEMO_EMBED_PROVIDER"

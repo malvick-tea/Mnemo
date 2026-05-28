@@ -9,7 +9,7 @@ providers is `.env` only — no code changes.
 |---|---|---|---|
 | Cheap, multi-model | OpenRouter | Ollama (bge-m3) | Default. Pay-per-token, embed stays local. |
 | Fully local | Ollama | Ollama | Needs ≥ 8 GB GPU or be patient on CPU. |
-| Premium quality | OpenRouter (Claude/GPT-4o) | OpenAI (text-embedding-3-small) | Best out-of-the-box quality. |
+| Premium quality | OpenRouter (Claude Opus 4.7 / GPT-5.5) | OpenAI (text-embedding-3-small) | Best out-of-the-box quality. |
 | Mixed | OpenRouter for RAG, Ollama for summary/tag | Ollama | Caps cost; only the rare RAG call hits the cloud. |
 
 ## Knobs in `.env`
@@ -18,15 +18,28 @@ providers is `.env` only — no code changes.
 MNEMO_LLM_PROVIDER=openrouter        # openrouter | ollama
 MNEMO_EMBED_PROVIDER=ollama          # ollama | openai
 
-# Per-job model routing
-MNEMO_MODEL_SUMMARIZE=google/gemini-2.5-flash
-MNEMO_MODEL_TAG=google/gemini-2.5-flash
-MNEMO_MODEL_RAG=anthropic/claude-sonnet-4.6
-MNEMO_MODEL_VISION=openai/gpt-4o
+# Per-job model routing (May 2026 frontier defaults)
+MNEMO_MODEL_SUMMARIZE=google/gemini-3.5-flash    # Google I/O 2026-05-19
+MNEMO_MODEL_TAG=google/gemini-3.5-flash
+MNEMO_MODEL_RAG=anthropic/claude-opus-4.7        # Anthropic 2026-04-16
+MNEMO_MODEL_VISION=anthropic/claude-opus-4.7     # 3.75MP native vision
 
 MNEMO_EMBED_MODEL=bge-m3
 MNEMO_EMBED_DIM=1024                 # bge-m3=1024; text-embedding-3-small=1536
 ```
+
+### Model picker cheatsheet (May 2026)
+
+| Class | Top picks on OpenRouter |
+|---|---|
+| Frontier reasoning | `anthropic/claude-opus-4.7`, `openai/gpt-5.5`, `openai/gpt-5.5-pro`, `deepseek/v4-pro` (1.6T MoE) |
+| Fast/cheap workhorse | `google/gemini-3.5-flash`, `google/gemini-3-flash`, `anthropic/claude-haiku-4.5`, `deepseek/v4-flash` (1M context) |
+| Vision (OCR + scene) | `anthropic/claude-opus-4.7` (3.75MP), `openai/gpt-5.5`, `google/gemini-3.5-flash` (full multimodal) |
+| Best open-source | `qwen/qwen3.7-max`, `google/gemma-4-31b` |
+
+Slugs assume OpenRouter — Anthropic's API uses `claude-opus-4-7`,
+OpenAI's uses `gpt-5.5`. The provider prefix is the OpenRouter
+namespace, not part of the model name.
 
 **Important:** if you change `MNEMO_EMBED_DIM` after first boot you must
 re-embed every chunk. The Alembic-managed Qdrant collection is created at
@@ -66,10 +79,11 @@ OLLAMA_BASE_URL=http://host.docker.internal:11434
 Models we test against:
 
 ```bash
-ollama pull bge-m3                # embeddings, 1024-dim
-ollama pull llama3.1:8b-instruct  # summary + tagging
-ollama pull qwen2.5:32b-instruct  # RAG answers (32 GB RAM recommended)
-ollama pull qwen2.5-vl:7b         # vision
+ollama pull bge-m3                  # embeddings, 1024-dim
+ollama pull qwen3:8b-instruct       # summary + tagging
+ollama pull qwen3:32b-instruct      # RAG answers (32 GB RAM recommended)
+ollama pull qwen2.5-vl:7b           # vision (Ollama-native vision is
+                                    # milestone-3 on the Mnemo side)
 ```
 
 ## Cost guardrails

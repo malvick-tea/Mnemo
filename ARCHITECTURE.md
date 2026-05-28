@@ -169,10 +169,10 @@ Default routing (override in `.env`):
 
 | job | model |
 |---|---|
-| summarization | `google/gemini-2.5-flash` (cheap, fast) |
+| summarization | `google/gemini-3.5-flash` (cheap, fast — I/O 2026) |
 | tagging | same as summarization |
-| RAG answer | `anthropic/claude-sonnet-4.6` (strong) |
-| vision | `qwen2.5-vl:7b` (local) or `gpt-4o` (cloud) |
+| RAG answer | `anthropic/claude-opus-4.7` (best agentic, Apr 2026) |
+| vision | `anthropic/claude-opus-4.7` (3.75MP native) or local `qwen2.5-vl:7b` |
 | embedding | `bge-m3` via Ollama (default) or `text-embedding-3-small` |
 
 ### Prompts
