@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Mnemo Core API — capture, search, RAG, settings"
 requires-python = ">=3.12"
 license = { text = "MIT" }
-readme = "../../README.md"
+readme = "README.md"
 
 dependencies = [
     "fastapi==0.115.5",

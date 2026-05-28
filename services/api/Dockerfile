@@ -18,6 +18,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # ── deps layer (cacheable) ──────────────────────────────────────────────────
 COPY pyproject.toml ./
+COPY README.md ./
 COPY src ./src
 COPY alembic.ini ./
 RUN uv venv /opt/venv \
