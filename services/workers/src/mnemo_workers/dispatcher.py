@@ -15,13 +15,13 @@ import asyncio
 import json
 import signal
 import time
-from typing import Any
-
-from redis.asyncio import Redis
+from typing import Any, cast
 
 from mnemo_api.config import get_settings
 from mnemo_api.logging import configure_logging, get_logger
 from mnemo_api.metrics import queue_depth
+from redis.asyncio import Redis
+
 from mnemo_workers.metrics_server import start_metrics_server
 from mnemo_workers.tasks.embed import embed_note
 from mnemo_workers.tasks.n8n import trigger_n8n_workflow
@@ -67,14 +67,16 @@ async def _loop() -> None:
     last_depth_refresh = 0.0
     try:
         while not stop.is_set():
-            res = await redis.brpop([_TASK_QUEUE], timeout=2)
+            brpop = cast(Any, redis.brpop)
+            res = await brpop([_TASK_QUEUE], timeout=2)
             now = time.monotonic()
             if now - last_depth_refresh >= _DEPTH_REFRESH_SECONDS:
                 try:
-                    depth = await redis.llen(_TASK_QUEUE)
+                    llen = cast(Any, redis.llen)
+                    depth = await llen(_TASK_QUEUE)
                     queue_depth.set(float(depth))
-                except Exception:  # noqa: BLE001
-                    pass
+                except Exception:
+                    log.debug("dispatcher.depth_refresh_failed", exc_info=True)
                 last_depth_refresh = now
 
             if res is None:
@@ -88,7 +90,7 @@ async def _loop() -> None:
                     continue
                 payload = msg.get("payload") or {}
                 actor.send(**payload)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 log.exception("dispatcher.dispatch_failed", raw=raw[:200])
     finally:
         await redis.aclose()

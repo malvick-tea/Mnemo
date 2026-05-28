@@ -24,23 +24,17 @@ _TAG_LIMIT = 30
 
 
 @router.message(Command("recent"))
-async def recent_command(
-    message: Message, api: ApiClient, tg_user_id: int
-) -> None:
+async def recent_command(message: Message, api: ApiClient, tg_user_id: int) -> None:
     placeholder = await message.reply("📂 Pulling your last captures…")
     try:
-        notes = await api._request(  # noqa: SLF001 — small helper, narrow use
-            tg_user_id, "GET", f"/v1/notes?limit={_RECENT_LIMIT}"
-        )
+        notes = await api._request(tg_user_id, "GET", f"/v1/notes?limit={_RECENT_LIMIT}")
     except Exception:
         log.exception("recent.api_failed", tg_user_id=tg_user_id)
         await placeholder.edit_text("❌ Couldn't reach Mnemo.")
         return
 
     if not isinstance(notes, list) or not notes:
-        await placeholder.edit_text(
-            "Nothing yet — send me something to capture."
-        )
+        await placeholder.edit_text("Nothing yet — send me something to capture.")
         return
 
     lines: list[str] = ["🗂 *Recent captures*\n"]
@@ -53,19 +47,16 @@ async def recent_command(
         when = (n.get("created_at") or "")[:10]
         lines.append(f"`[{short}]` {kind} · {when} — {title}")
     await placeholder.edit_text(
-        "\n".join(lines)[:4_000], parse_mode="Markdown",
+        "\n".join(lines)[:4_000],
+        parse_mode="Markdown",
     )
 
 
 @router.message(Command("tags"))
-async def tags_command(
-    message: Message, api: ApiClient, tg_user_id: int
-) -> None:
+async def tags_command(message: Message, api: ApiClient, tg_user_id: int) -> None:
     placeholder = await message.reply("🏷 Loading tags…")
     try:
-        tags = await api._request(  # noqa: SLF001
-            tg_user_id, "GET", "/v1/tags"
-        )
+        tags = await api._request(tg_user_id, "GET", "/v1/tags")
     except Exception:
         log.exception("tags.api_failed", tg_user_id=tg_user_id)
         await placeholder.edit_text("❌ Couldn't load tags.")
@@ -81,7 +72,8 @@ async def tags_command(
     for t in _format_tags(tags)[:_TAG_LIMIT]:
         lines.append(t)
     await placeholder.edit_text(
-        "\n".join(lines)[:4_000], parse_mode="Markdown",
+        "\n".join(lines)[:4_000],
+        parse_mode="Markdown",
     )
 
 

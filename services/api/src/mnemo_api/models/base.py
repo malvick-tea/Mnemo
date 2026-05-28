@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import ClassVar
 from uuid import UUID
 
 from sqlalchemy import MetaData
@@ -21,7 +22,7 @@ NAMING_CONVENTION = {
 class Base(MappedAsDataclass, DeclarativeBase, kw_only=True):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
-    type_annotation_map = {
+    type_annotation_map: ClassVar[dict[type[object], object]] = {
         UUID: __import__("sqlalchemy").Uuid(as_uuid=True),
         datetime: __import__("sqlalchemy").DateTime(timezone=True),
     }

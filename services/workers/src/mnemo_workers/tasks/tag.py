@@ -5,13 +5,13 @@ from __future__ import annotations
 from uuid import UUID
 
 import dramatiq
-
 from mnemo_api.config import get_settings
 from mnemo_api.db import session_factory
 from mnemo_api.llm import make_llm
 from mnemo_api.logging import get_logger
 from mnemo_api.models import Note
 from mnemo_api.services.tagging import suggest_and_apply_tags
+
 from mnemo_workers.runner import run
 
 log = get_logger(__name__)
@@ -30,8 +30,10 @@ async def _tag_note(note_id: UUID) -> None:
             if note is None or not note.processed_content:
                 return
             applied = await suggest_and_apply_tags(
-                session, llm,
-                note_id=note.id, user_id=note.user_id,
+                session,
+                llm,
+                note_id=note.id,
+                user_id=note.user_id,
                 content=note.processed_content,
             )
             await session.commit()

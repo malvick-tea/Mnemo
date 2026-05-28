@@ -8,10 +8,9 @@ from uuid import UUID
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import desc, func, select, text
-
 from mnemo_api.db import session_factory
 from mnemo_api.models import Note, NoteTag, Query, Tag
+from sqlalchemy import desc, func, select, text
 
 from mnemo_webapp import __version__
 
@@ -33,7 +32,7 @@ async def readyz() -> dict[str, str]:
     try:
         async with session_factory()() as session:
             await session.execute(text("SELECT 1"))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise HTTPException(503, f"postgres unavailable: {exc}") from exc
     return {"status": "ready"}
 
@@ -42,15 +41,15 @@ async def readyz() -> dict[str, str]:
 async def index(request: Request) -> HTMLResponse:
     async with session_factory()() as session:
         notes = (
-            await session.execute(
-                select(Note).order_by(desc(Note.created_at)).limit(50)
-            )
-        ).scalars().all()
+            (await session.execute(select(Note).order_by(desc(Note.created_at)).limit(50)))
+            .scalars()
+            .all()
+        )
         recent_queries = (
-            await session.execute(
-                select(Query).order_by(desc(Query.created_at)).limit(10)
-            )
-        ).scalars().all()
+            (await session.execute(select(Query).order_by(desc(Query.created_at)).limit(10)))
+            .scalars()
+            .all()
+        )
         tag_rows = (
             await session.execute(
                 select(Tag.name, func.count(NoteTag.note_id).label("cnt"))
@@ -83,12 +82,16 @@ async def note_detail(request: Request, note_id: str) -> HTMLResponse:
         if note is None:
             return HTMLResponse("Not found", status_code=404)
         tag_names = (
-            await session.execute(
-                select(Tag.name)
-                .join(NoteTag, NoteTag.tag_id == Tag.id)
-                .where(NoteTag.note_id == note.id)
+            (
+                await session.execute(
+                    select(Tag.name)
+                    .join(NoteTag, NoteTag.tag_id == Tag.id)
+                    .where(NoteTag.note_id == note.id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     return templates.TemplateResponse(
         request,
         "note.html",

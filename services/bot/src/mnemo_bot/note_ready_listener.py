@@ -38,7 +38,7 @@ async def listen_bot_events(bot: Bot, redis: Redis, api: ApiClient) -> None:
         async for msg in pubsub.listen():
             try:
                 await _dispatch(bot, redis, api, msg)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 log.exception("bot_events.handle_failed", msg=str(msg)[:200])
     except asyncio.CancelledError:
         pass
@@ -51,9 +51,7 @@ async def listen_bot_events(bot: Bot, redis: Redis, api: ApiClient) -> None:
 listen_note_ready = listen_bot_events
 
 
-async def _dispatch(
-    bot: Bot, redis: Redis, api: ApiClient, msg: dict[str, Any]
-) -> None:
+async def _dispatch(bot: Bot, redis: Redis, api: ApiClient, msg: dict[str, Any]) -> None:
     if msg.get("type") != "pmessage":
         return
     channel = (msg.get("channel") or b"").decode("utf-8", errors="replace")
@@ -71,9 +69,7 @@ async def _dispatch(
         log.warning("bot_events.unknown_channel", channel=channel)
 
 
-async def _handle_note_ready(
-    bot: Bot, redis: Redis, api: ApiClient, data: dict[str, Any]
-) -> None:
+async def _handle_note_ready(bot: Bot, redis: Redis, api: ApiClient, data: dict[str, Any]) -> None:
     note_id_str = data.get("note_id")
     tg_user_id = data.get("tg_user_id")
     if note_id_str is None or tg_user_id is None:
@@ -115,9 +111,9 @@ async def _handle_note_ready(
                 reply_markup=note_actions(note_id),
                 parse_mode=None,
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.exception("note_ready.edit_failed", note_id=note_id_str)
-    except Exception:  # noqa: BLE001
+    except Exception:
         log.exception("note_ready.edit_failed", note_id=note_id_str)
     finally:
         await redis.delete(f"mnemo:msg:{note_id_str}")
@@ -136,7 +132,7 @@ async def _handle_digest(bot: Bot, data: dict[str, Any]) -> None:
             parse_mode=None,
         )
         log.info("digest.delivered", tg_user_id=tg_user_id, len=len(text))
-    except Exception:  # noqa: BLE001
+    except Exception:
         log.exception("digest.send_failed", tg_user_id=tg_user_id)
 
 

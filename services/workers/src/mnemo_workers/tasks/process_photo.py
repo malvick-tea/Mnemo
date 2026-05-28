@@ -16,14 +16,14 @@ from __future__ import annotations
 from uuid import UUID
 
 import dramatiq
-from sqlalchemy import select
-
 from mnemo_api.config import get_settings
 from mnemo_api.db import session_factory
 from mnemo_api.llm import make_vision_llm, render_prompt
 from mnemo_api.logging import get_logger
 from mnemo_api.models import Note, NoteStatus
 from mnemo_api.services.queue import enqueue
+from sqlalchemy import select
+
 from mnemo_workers.minio_io import download_blob
 from mnemo_workers.redis_io import get_redis
 from mnemo_workers.runner import run
@@ -55,7 +55,7 @@ async def _process_photo_note(note_id: UUID, blob_key: str) -> None:
 
         try:
             image_bytes = download_blob(blob_key)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.exception("photo.download.failed", note_id=str(note_id))
             await _fail(note_id, f"download: {exc}")
             return
@@ -71,7 +71,7 @@ async def _process_photo_note(note_id: UUID, blob_key: str) -> None:
                 temperature=0.2,
                 prompt_fingerprint=fp,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.exception("photo.vision.failed", note_id=str(note_id))
             await _fail(note_id, f"vision: {exc}")
             return
@@ -112,9 +112,7 @@ async def _process_photo_note(note_id: UUID, blob_key: str) -> None:
 
 async def _fail(note_id: UUID, message: str) -> None:
     async with session_factory()() as session:
-        note = (
-            await session.execute(select(Note).where(Note.id == note_id))
-        ).scalar_one_or_none()
+        note = (await session.execute(select(Note).where(Note.id == note_id))).scalar_one_or_none()
         if note is None:
             return
         note.status = NoteStatus.failed.value

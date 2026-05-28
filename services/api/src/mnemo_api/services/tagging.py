@@ -41,9 +41,7 @@ async def suggest_and_apply_tags(
     )
     existing = [r.name for r in rows]
 
-    prompt, fp = render_prompt(
-        "tag_suggest_v1", existing_tags=existing, content=content[:4000]
-    )
+    prompt, fp = render_prompt("tag_suggest_v1", existing_tags=existing, content=content[:4000])
     completion = await llm.chat(
         [Message(role="user", content=prompt)],
         model=settings.model_tag,
@@ -55,8 +53,7 @@ async def suggest_and_apply_tags(
 
     proposed = _parse_tags(completion.text)
     if not proposed:
-        log.warning("tagging.parse_failed", note_id=str(note_id),
-                    raw=completion.text[:200])
+        log.warning("tagging.parse_failed", note_id=str(note_id), raw=completion.text[:200])
         return []
 
     note = await session.get(Note, note_id)
@@ -92,9 +89,7 @@ def _parse_tags(raw: str) -> list[str]:
 
 
 async def _get_or_create_tag(session: AsyncSession, *, user_id: UUID, name: str) -> Tag:
-    res = await session.execute(
-        select(Tag).where(Tag.user_id == user_id, Tag.name == name)
-    )
+    res = await session.execute(select(Tag).where(Tag.user_id == user_id, Tag.name == name))
     existing = res.scalar_one_or_none()
     if existing is not None:
         return existing

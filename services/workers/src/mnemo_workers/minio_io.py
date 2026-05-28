@@ -10,7 +10,6 @@ import io
 from functools import lru_cache
 
 from minio import Minio
-
 from mnemo_api.config import get_settings
 
 

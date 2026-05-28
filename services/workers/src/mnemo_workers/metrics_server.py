@@ -11,9 +11,8 @@ from __future__ import annotations
 
 import os
 
-from prometheus_client import start_http_server
-
 from mnemo_api.logging import get_logger
+from prometheus_client import start_http_server
 
 log = get_logger(__name__)
 

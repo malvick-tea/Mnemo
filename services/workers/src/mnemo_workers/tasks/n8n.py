@@ -15,6 +15,8 @@ from uuid import UUID
 
 import dramatiq
 import httpx
+from mnemo_api.config import get_settings
+from mnemo_api.logging import get_logger
 from tenacity import (
     AsyncRetrying,
     retry_if_exception_type,
@@ -22,8 +24,6 @@ from tenacity import (
     wait_exponential,
 )
 
-from mnemo_api.config import get_settings
-from mnemo_api.logging import get_logger
 from mnemo_workers.runner import run
 
 log = get_logger(__name__)

@@ -45,9 +45,7 @@ async def query_command(
 
 
 @router.callback_query(F.data.startswith("qfb:"))
-async def query_feedback_cb(
-    cq: CallbackQuery, api: ApiClient, tg_user_id: int
-) -> None:
+async def query_feedback_cb(cq: CallbackQuery, api: ApiClient, tg_user_id: int) -> None:
     _, qid_str, rating_str = (cq.data or "").split(":")
     try:
         await api.feedback(tg_user_id, UUID(qid_str), int(rating_str))
@@ -58,9 +56,7 @@ async def query_feedback_cb(
 
 
 @router.callback_query(F.data.startswith("cite:"))
-async def open_citation(
-    cq: CallbackQuery, api: ApiClient, tg_user_id: int
-) -> None:
+async def open_citation(cq: CallbackQuery, api: ApiClient, tg_user_id: int) -> None:
     _, nid = (cq.data or "").split(":", 1)
     try:
         note = await api.get_note(tg_user_id, UUID(nid))
@@ -102,9 +98,7 @@ async def _ask(
     body = answer.strip() or "I couldn't find anything to back up an answer."
     if citations:
         body += "\n\n— sources below —"
-    await placeholder.edit_text(
-        body[:4_000], reply_markup=query_feedback(qid, citation_pairs)
-    )
+    await placeholder.edit_text(body[:4_000], reply_markup=query_feedback(qid, citation_pairs))
 
     await state.set_state(QueryFlow.in_thread)
     await state.update_data(last_q=q, thread_started_at=tg_user_id)

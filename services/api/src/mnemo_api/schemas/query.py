@@ -16,9 +16,9 @@ class QueryIn(BaseModel):
 
 class Citation(BaseModel):
     note_id: UUID
-    short_id: str           # first 8 chars of the UUID, used in the prompt
+    short_id: str  # first 8 chars of the UUID, used in the prompt
     title: str | None
-    excerpt: str            # ≤300 chars
+    excerpt: str  # ≤300 chars
     captured_at: str
     source_type: str
     source_url: str | None = None

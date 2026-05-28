@@ -27,7 +27,10 @@ _PLACEHOLDER_TTL = 60 * 30
 @router.message(
     (F.forward_from | F.forward_from_chat | F.forward_origin)
     & F.text
-    & ~F.photo & ~F.voice & ~F.audio & ~F.document
+    & ~F.photo
+    & ~F.voice
+    & ~F.audio
+    & ~F.document
 )
 async def capture_forward(
     message: Message,
@@ -37,9 +40,7 @@ async def capture_forward(
 ) -> None:
     text = message.text or message.caption or ""
     if not text.strip():
-        await message.reply(
-            "↪️ Forward had no text. Forward a message with text content."
-        )
+        await message.reply("↪️ Forward had no text. Forward a message with text content.")
         return
 
     placeholder = await message.reply("↪️ Saving forwarded message…")
@@ -64,7 +65,8 @@ async def capture_forward(
     )
     log.info(
         "capture_forward.queued",
-        note_id=note_id, origin_type=forward_meta.get("origin_type"),
+        note_id=note_id,
+        origin_type=forward_meta.get("origin_type"),
     )
 
 

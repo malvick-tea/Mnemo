@@ -19,7 +19,10 @@ class Settings(BaseSettings):
     """Strict typed config. Bombs on placeholder secrets so prod is safe."""
 
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        protected_namespaces=("settings_",),
     )
 
     # ── Deployment ──────────────────────────────────────────────────────────
@@ -76,9 +79,7 @@ class Settings(BaseSettings):
     # - rag: quality-critical → Claude Opus 4.7 (Anthropic 2026-04-16)
     # - vision: 3.75-megapixel native vision in Opus 4.7; reuse it
     # Swap to anything OpenRouter exposes by changing the env var.
-    model_summarize: str = Field(
-        default="google/gemini-3.5-flash", alias="MNEMO_MODEL_SUMMARIZE"
-    )
+    model_summarize: str = Field(default="google/gemini-3.5-flash", alias="MNEMO_MODEL_SUMMARIZE")
     model_tag: str = Field(default="google/gemini-3.5-flash", alias="MNEMO_MODEL_TAG")
     model_rag: str = Field(default="anthropic/claude-opus-4.7", alias="MNEMO_MODEL_RAG")
     model_vision: str = Field(default="anthropic/claude-opus-4.7", alias="MNEMO_MODEL_VISION")
@@ -90,9 +91,7 @@ class Settings(BaseSettings):
     embed_dim: int = Field(default=1024, alias="MNEMO_EMBED_DIM")
 
     use_reranker: bool = Field(default=False, alias="MNEMO_USE_RERANKER")
-    rerank_model: str = Field(
-        default="BAAI/bge-reranker-v2-m3", alias="MNEMO_RERANK_MODEL"
-    )
+    rerank_model: str = Field(default="BAAI/bge-reranker-v2-m3", alias="MNEMO_RERANK_MODEL")
 
     user_daily_token_cap: int = Field(default=200_000, alias="MNEMO_USER_DAILY_TOKEN_CAP")
 
@@ -117,9 +116,7 @@ class Settings(BaseSettings):
     def allowed_tg_ids_set(self) -> frozenset[int]:
         if not self.allowed_tg_ids:
             return frozenset()
-        return frozenset(
-            int(x.strip()) for x in self.allowed_tg_ids.split(",") if x.strip()
-        )
+        return frozenset(int(x.strip()) for x in self.allowed_tg_ids.split(",") if x.strip())
 
     # ── Validators ──────────────────────────────────────────────────────────
     @field_validator(

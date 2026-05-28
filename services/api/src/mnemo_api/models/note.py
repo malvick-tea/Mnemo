@@ -64,7 +64,7 @@ class Note(Base):
         ),
     )
 
-    id: Mapped[UUID] = mapped_column(primary_key=True, default_factory=uuid4)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default_factory=uuid4, init=False)
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
@@ -83,16 +83,16 @@ class Note(Base):
     )
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(),
+        DateTime(timezone=True),
+        server_default=func.now(),
         default_factory=lambda: datetime.now(UTC),
     )
     captured_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False,
+        DateTime(timezone=True),
+        nullable=False,
         default_factory=lambda: datetime.now(UTC),
     )
-    processed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), default=None
-    )
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
     error_message: Mapped[str | None] = mapped_column(Text, default=None)
 
@@ -114,23 +114,22 @@ class Tag(Base):
     __tablename__ = "tags"
     __table_args__ = (UniqueConstraint("user_id", "name"),)
 
-    id: Mapped[UUID] = mapped_column(primary_key=True, default_factory=uuid4)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default_factory=uuid4, init=False)
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(64), nullable=False)
     color: Mapped[str | None] = mapped_column(String(16), default=None)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(),
+        DateTime(timezone=True),
+        server_default=func.now(),
         default_factory=lambda: datetime.now(UTC),
     )
 
 
 class NoteTag(Base):
     __tablename__ = "note_tags"
-    __table_args__ = (
-        CheckConstraint("source IN ('ai','user')", name="source_enum"),
-    )
+    __table_args__ = (CheckConstraint("source IN ('ai','user')", name="source_enum"),)
 
     note_id: Mapped[UUID] = mapped_column(
         ForeignKey("notes.id", ondelete="CASCADE"), primary_key=True

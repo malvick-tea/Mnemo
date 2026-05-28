@@ -13,9 +13,7 @@ from mnemo_api.llm.openrouter import OpenRouterClient
 def make_llm(settings: Settings) -> LLMClient:
     if settings.llm_provider == "openrouter":
         if not settings.openrouter_api_key:
-            raise MnemoError(
-                "MNEMO_LLM_PROVIDER=openrouter requires OPENROUTER_API_KEY"
-            )
+            raise MnemoError("MNEMO_LLM_PROVIDER=openrouter requires OPENROUTER_API_KEY")
         return OpenRouterClient(
             base_url=settings.openrouter_base_url,
             api_key=settings.openrouter_api_key.get_secret_value(),
@@ -51,9 +49,7 @@ def make_embedder(settings: Settings) -> Embedder:
         )
     if settings.embed_provider == "openai":
         if not settings.openai_api_key:
-            raise MnemoError(
-                "MNEMO_EMBED_PROVIDER=openai requires OPENAI_API_KEY"
-            )
+            raise MnemoError("MNEMO_EMBED_PROVIDER=openai requires OPENAI_API_KEY")
         return OpenAIEmbedder(
             api_key=settings.openai_api_key.get_secret_value(),
             model=settings.embed_model,

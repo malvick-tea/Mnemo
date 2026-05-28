@@ -1,6 +1,6 @@
 """aiogram middlewares — applied in `mnemo_bot.main` in this order:
 
-    correlation → auth → throttle → error
+correlation → auth → throttle → error
 """
 
 from mnemo_bot.middlewares.auth import AuthMiddleware

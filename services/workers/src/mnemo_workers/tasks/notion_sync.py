@@ -19,13 +19,13 @@ from uuid import UUID
 
 import dramatiq
 import httpx
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from mnemo_api.crypto import decrypt
 from mnemo_api.db import session_factory
 from mnemo_api.logging import get_logger
 from mnemo_api.models import Integration, Note, NoteStatus, NoteTag, Tag
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from mnemo_workers.runner import run
 
 log = get_logger(__name__)
@@ -53,7 +53,7 @@ async def _run_for_all() -> None:
     for integ in integrations:
         try:
             await _sync_user(integ.user_id, integ.id)
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.exception("notion.sync.user_failed", user_id=str(integ.user_id))
 
 
@@ -64,10 +64,11 @@ async def _sync_user(user_id: UUID, integration_id: UUID) -> None:
             return
         try:
             config = json.loads(decrypt(integ.config_encrypted).decode("utf-8"))
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning(
                 "notion.sync.bad_credentials",
-                user_id=str(user_id), error=str(exc),
+                user_id=str(user_id),
+                error=str(exc),
             )
             return
 
@@ -77,7 +78,8 @@ async def _sync_user(user_id: UUID, integration_id: UUID) -> None:
             log.warning(
                 "notion.sync.incomplete_config",
                 user_id=str(user_id),
-                has_token=bool(token), has_db=bool(database_id),
+                has_token=bool(token),
+                has_db=bool(database_id),
             )
             return
 
@@ -102,23 +104,24 @@ async def _sync_user(user_id: UUID, integration_id: UUID) -> None:
                 try:
                     await _push_note(client, database_id, note, tags)
                     pushed += 1
-                except Exception:  # noqa: BLE001
+                except Exception:
                     log.exception(
                         "notion.sync.push_failed",
-                        user_id=str(user_id), note_id=str(note.id),
+                        user_id=str(user_id),
+                        note_id=str(note.id),
                     )
 
         integ.last_synced_at = datetime.now(UTC)
         await session.commit()
         log.info(
             "notion.sync.user_done",
-            user_id=str(user_id), candidates=len(notes), pushed=pushed,
+            user_id=str(user_id),
+            candidates=len(notes),
+            pushed=pushed,
         )
 
 
-async def _select_notes(
-    session: AsyncSession, user_id: UUID, since: datetime
-) -> list[Note]:
+async def _select_notes(session: AsyncSession, user_id: UUID, since: datetime) -> list[Note]:
     rows = await session.execute(
         select(Note)
         .where(
@@ -134,9 +137,7 @@ async def _select_notes(
 
 async def _tags_for(session: AsyncSession, note_id: UUID) -> list[str]:
     rows = await session.execute(
-        select(Tag.name)
-        .join(NoteTag, NoteTag.tag_id == Tag.id)
-        .where(NoteTag.note_id == note_id)
+        select(Tag.name).join(NoteTag, NoteTag.tag_id == Tag.id).where(NoteTag.note_id == note_id)
     )
     return [r.name for r in rows]
 
@@ -157,18 +158,14 @@ async def _push_note(
     if note.source_url:
         properties["URL"] = {"url": note.source_url}
     if tags:
-        properties["Tags"] = {
-            "multi_select": [{"name": t[:90]} for t in tags[:10]]
-        }
+        properties["Tags"] = {"multi_select": [{"name": t[:90]} for t in tags[:10]]}
 
     children = [
         {
             "object": "block",
             "type": "paragraph",
             "paragraph": {
-                "rich_text": [
-                    {"type": "text", "text": {"content": summary or "(no summary)"}}
-                ]
+                "rich_text": [{"type": "text", "text": {"content": summary or "(no summary)"}}]
             },
         }
     ]

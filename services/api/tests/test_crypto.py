@@ -18,6 +18,7 @@ def test_associated_data_binds_ciphertext() -> None:
     # Wrong AAD → exception
     import pytest
     from cryptography.exceptions import InvalidTag
+
     with pytest.raises(InvalidTag):
         decrypt(ct, associated_data=b"user:43")
 

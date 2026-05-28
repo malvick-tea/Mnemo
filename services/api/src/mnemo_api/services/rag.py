@@ -63,8 +63,12 @@ async def answer_question(
 
     try:
         hits = await hybrid_search(
-            session=session, qdrant=qdrant, embedder=embedder,
-            user_id=user_id, query=query, top_k=top_k,
+            session=session,
+            qdrant=qdrant,
+            embedder=embedder,
+            user_id=user_id,
+            query=query,
+            top_k=top_k,
         )
     except Exception:
         query_total.labels(outcome="error").inc()
@@ -142,9 +146,7 @@ async def _build_citations(
         # can still see what informed the answer.
         relevant = {h.note_id: h for h in hits[:3]}
 
-    rows = await session.execute(
-        select(Note).where(Note.id.in_(relevant.keys()))
-    )
+    rows = await session.execute(select(Note).where(Note.id.in_(relevant.keys())))
     notes_by_id = {n.id: n for n in rows.scalars()}
     out: list[CitationOut] = []
     for note_id, hit in relevant.items():
@@ -164,9 +166,7 @@ async def _build_citations(
     return out
 
 
-async def _log_query(
-    session: AsyncSession, user_id: UUID, query: str, result: RagResult
-) -> UUID:
+async def _log_query(session: AsyncSession, user_id: UUID, query: str, result: RagResult) -> UUID:
     q = Query(
         user_id=user_id,
         query_text=query,

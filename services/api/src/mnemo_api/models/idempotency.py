@@ -23,7 +23,8 @@ class IdempotencyKey(Base):
 
     key: Mapped[str] = mapped_column(Text, primary_key=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(),
+        DateTime(timezone=True),
+        server_default=func.now(),
         default_factory=lambda: datetime.now(UTC),
     )
     response_body: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)

@@ -43,9 +43,7 @@ class Settings(BaseSettings):
     def allowed_tg_ids_set(self) -> frozenset[int]:
         if not self.allowed_tg_ids:
             return frozenset()
-        return frozenset(
-            int(x.strip()) for x in self.allowed_tg_ids.split(",") if x.strip()
-        )
+        return frozenset(int(x.strip()) for x in self.allowed_tg_ids.split(",") if x.strip())
 
 
 @lru_cache(maxsize=1)

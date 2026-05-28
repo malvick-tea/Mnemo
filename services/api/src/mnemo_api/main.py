@@ -35,8 +35,10 @@ from mnemo_api.routers import (
     integrations,
     notes,
     query,
-    settings as settings_router,
     webhooks_n8n,
+)
+from mnemo_api.routers import (
+    settings as settings_router,
 )
 
 
@@ -48,9 +50,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     qdrant = AsyncQdrantClient(
         url=settings.qdrant_url,
-        api_key=(
-            settings.qdrant_api_key.get_secret_value() if settings.qdrant_api_key else None
-        ),
+        api_key=(settings.qdrant_api_key.get_secret_value() if settings.qdrant_api_key else None),
     )
     await ensure_collection(qdrant, settings)
 
@@ -82,7 +82,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     finally:
         log.info("shutdown.begin")
         await qdrant.close()
-        await redis.aclose()
+        await redis.close()
         # OpenRouter / Ollama clients have aclose; embedders too.
         for component in (llm, embedder):
             close = getattr(component, "aclose", None)

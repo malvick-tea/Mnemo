@@ -95,6 +95,7 @@ async def test_capture_query_roundtrip() -> None:
         await session.commit()
 
         from qdrant_client.http.models import PointStruct
+
         await qdrant.upsert(
             collection_name=settings.qdrant_collection,
             points=[
@@ -118,8 +119,11 @@ async def test_capture_query_roundtrip() -> None:
     # 2. Query: hybrid search must return our note among the hits.
     async with session_factory()() as session:
         hits = await hybrid_search(
-            session=session, qdrant=qdrant, embedder=embedder,
-            user_id=user.id, query="logical replication in postgres",
+            session=session,
+            qdrant=qdrant,
+            embedder=embedder,
+            user_id=user.id,
+            query="logical replication in postgres",
         )
     assert hits, "expected at least one hit"
     assert hits[0].note_id == note.id

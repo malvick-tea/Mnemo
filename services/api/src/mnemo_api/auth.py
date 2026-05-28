@@ -33,9 +33,7 @@ def make_service_token(tg_user_id: int, *, ttl_seconds: int = 900) -> str:
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(seconds=ttl_seconds)).timestamp()),
     }
-    return jwt.encode(
-        payload, settings.service_jwt_secret.get_secret_value(), algorithm=_JWT_ALG
-    )
+    return jwt.encode(payload, settings.service_jwt_secret.get_secret_value(), algorithm=_JWT_ALG)
 
 
 def verify_service_token(token: str) -> int:
@@ -73,8 +71,6 @@ def verify_webhook_signature(
         raise WebhookSignatureError("Timestamp outside replay window")
 
     secret = get_settings().webhook_hmac_secret.get_secret_value().encode("utf-8")
-    expected = hmac.new(
-        secret, f"{ts}.".encode() + body, hashlib.sha256
-    ).hexdigest()
+    expected = hmac.new(secret, f"{ts}.".encode() + body, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, signature_header):
         raise WebhookSignatureError("Signature mismatch")

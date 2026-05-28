@@ -77,9 +77,7 @@ def split_into_chunks(
     return chunks
 
 
-def _slice_by_chars(
-    text: str, max_tokens: int, count_tokens: Callable[[str], int]
-) -> list[Chunk]:
+def _slice_by_chars(text: str, max_tokens: int, count_tokens: Callable[[str], int]) -> list[Chunk]:
     target_chars = max_tokens * 4
     out: list[Chunk] = []
     for i in range(0, len(text), target_chars):

@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
 from qdrant_client.http.models import FieldCondition, Filter, FilterSelector, MatchValue
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mnemo_api.config import get_settings
@@ -50,7 +50,7 @@ async def patch_note(
         await session.merge(NoteTag(note_id=note_id, tag_id=tag.id, source="user", confidence=1.0))
     for tag_name in payload.remove_tags:
         await session.execute(
-            NoteTag.__table__.delete().where(
+            delete(NoteTag).where(
                 NoteTag.note_id == note_id,
                 NoteTag.tag_id.in_(
                     select(Tag.id).where(
@@ -88,15 +88,11 @@ async def delete_note(
             collection_name=get_settings().qdrant_collection,
             points_selector=FilterSelector(
                 filter=Filter(
-                    must=[
-                        FieldCondition(
-                            key="note_id", match=MatchValue(value=str(note_id))
-                        )
-                    ]
+                    must=[FieldCondition(key="note_id", match=MatchValue(value=str(note_id)))]
                 )
             ),
         )
-    except Exception:  # noqa: BLE001
+    except Exception:
         log.exception("notes.delete.qdrant_cleanup_failed", note_id=str(note_id))
 
 
@@ -116,9 +112,11 @@ async def list_notes(
     if to is not None:
         stmt = stmt.where(Note.captured_at < to)
     if tag is not None:
-        stmt = stmt.join(NoteTag, NoteTag.note_id == Note.id).join(
-            Tag, Tag.id == NoteTag.tag_id
-        ).where(Tag.user_id == user.id, Tag.name == tag.lower().strip())
+        stmt = (
+            stmt.join(NoteTag, NoteTag.note_id == Note.id)
+            .join(Tag, Tag.id == NoteTag.tag_id)
+            .where(Tag.user_id == user.id, Tag.name == tag.lower().strip())
+        )
     if q is not None and q.strip():
         stmt = stmt.where(Note.content_tsv.op("@@")(func.websearch_to_tsquery("simple", q)))
     stmt = stmt.order_by(Note.created_at.desc()).limit(limit)
@@ -139,9 +137,7 @@ async def generate_anki(
     llm: LLMDep,
 ) -> AnkiCardsOut:
     try:
-        result = await generate_cards(
-            session, llm, user_id=user.id, note_id=note_id
-        )
+        result = await generate_cards(session, llm, user_id=user.id, note_id=note_id)
     except MnemoError as exc:
         raise HTTPException(exc.http_status, str(exc)) from exc
     return AnkiCardsOut(
@@ -160,10 +156,7 @@ async def list_tags(user: CurrentUser, session: SessionDep) -> list[TagOut]:
         .group_by(Tag.id, Tag.name, Tag.color)
         .order_by(func.count(NoteTag.note_id).desc())
     )
-    return [
-        TagOut(id=r.id, name=r.name, color=r.color, count=int(r.cnt))
-        for r in res
-    ]
+    return [TagOut(id=r.id, name=r.name, color=r.color, count=int(r.cnt)) for r in res]
 
 
 # ─── helpers ────────────────────────────────────────────────────────────────
@@ -178,12 +171,8 @@ async def _tags_for(session: AsyncSession, note_id: UUID) -> list[TagOut]:
     return [TagOut(id=r.id, name=r.name, color=r.color) for r in rows]
 
 
-async def _get_or_create_user_tag(
-    session: AsyncSession, user_id: UUID, name: str
-) -> Tag:
-    res = await session.execute(
-        select(Tag).where(Tag.user_id == user_id, Tag.name == name)
-    )
+async def _get_or_create_user_tag(session: AsyncSession, user_id: UUID, name: str) -> Tag:
+    res = await session.execute(select(Tag).where(Tag.user_id == user_id, Tag.name == name))
     existing = res.scalar_one_or_none()
     if existing is not None:
         return existing

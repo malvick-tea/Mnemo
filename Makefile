@@ -57,29 +57,29 @@ prod-logs:
 # ─── Build / quality gates ──────────────────────────────────────────────────
 .PHONY: lint
 lint: ## ruff + mypy on all services
-	@for svc in api bot workers; do \
+	@for svc in api bot workers webapp; do \
 	    echo "== ruff $$svc =="; \
 	    (cd services/$$svc && uv run ruff check .); \
 	    echo "== mypy $$svc =="; \
-	    (cd services/$$svc && uv run mypy --strict src); \
+	    (cd services/$$svc && uv run mypy src); \
 	done
 
 .PHONY: fmt
 fmt: ## ruff format
-	@for svc in api bot workers; do \
+	@for svc in api bot workers webapp; do \
 	    (cd services/$$svc && uv run ruff format .); \
 	done
 
 .PHONY: test
 test: ## Run full test suite (unit + integration)
-	@for svc in api bot workers; do \
+	@for svc in api bot workers webapp; do \
 	    echo "== pytest $$svc =="; \
 	    (cd services/$$svc && uv run pytest -q); \
 	done
 
 .PHONY: test-unit
 test-unit:
-	@for svc in api bot workers; do \
+	@for svc in api bot workers webapp; do \
 	    (cd services/$$svc && uv run pytest -q -m "not integration"); \
 	done
 

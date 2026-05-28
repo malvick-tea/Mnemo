@@ -18,12 +18,12 @@ import tempfile
 from uuid import UUID
 
 import dramatiq
-from sqlalchemy import select
-
 from mnemo_api.db import session_factory
 from mnemo_api.logging import get_logger
 from mnemo_api.models import Note, NoteStatus
 from mnemo_api.services.queue import enqueue
+from sqlalchemy import select
+
 from mnemo_workers.minio_io import download_blob
 from mnemo_workers.redis_io import get_redis
 from mnemo_workers.runner import run
@@ -55,14 +55,14 @@ async def _process_voice_note(note_id: UUID, blob_key: str) -> None:
 
         try:
             audio_bytes = download_blob(blob_key)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.exception("voice.download.failed", note_id=str(note_id))
             await _fail(note_id, f"download: {exc}")
             return
 
         try:
             transcript, language, duration = _transcribe(audio_bytes)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.exception("voice.transcribe.failed", note_id=str(note_id))
             await _fail(note_id, f"transcribe: {exc}")
             return
@@ -114,7 +114,7 @@ def _transcribe(audio: bytes) -> tuple[str, str | None, float | None]:
     # most builds; fall back to a temp file for codec quirks.
     try:
         segments, info = model.transcribe(io.BytesIO(audio), beam_size=5)
-    except Exception:  # noqa: BLE001
+    except Exception:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".audio") as tmp:
             tmp.write(audio)
             tmp_path = tmp.name
@@ -131,9 +131,7 @@ def _transcribe(audio: bytes) -> tuple[str, str | None, float | None]:
 
 async def _fail(note_id: UUID, message: str) -> None:
     async with session_factory()() as session:
-        note = (
-            await session.execute(select(Note).where(Note.id == note_id))
-        ).scalar_one_or_none()
+        note = (await session.execute(select(Note).where(Note.id == note_id))).scalar_one_or_none()
         if note is None:
             return
         note.status = NoteStatus.failed.value

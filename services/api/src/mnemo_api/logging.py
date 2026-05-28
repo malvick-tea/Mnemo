@@ -11,12 +11,13 @@ import sys
 from contextvars import ContextVar
 
 import structlog
+from structlog.typing import EventDict
 
 correlation_id_ctx: ContextVar[str | None] = ContextVar("correlation_id", default=None)
 user_id_ctx: ContextVar[str | None] = ContextVar("user_id", default=None)
 
 
-def _add_context(_logger: object, _method: str, event_dict: dict[str, object]) -> dict[str, object]:
+def _add_context(_logger: object, _method: str, event_dict: EventDict) -> EventDict:
     cid = correlation_id_ctx.get()
     if cid is not None:
         event_dict["correlation_id"] = cid

@@ -29,30 +29,51 @@ def upgrade() -> None:
         sa.Column("id", sa.Uuid(), primary_key=True, server_default=sa.text("gen_random_uuid()")),
         sa.Column("tg_user_id", sa.BigInteger(), nullable=False, unique=True),
         sa.Column("tg_username", sa.String(64), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True),
-                  nullable=False, server_default=sa.text("now()")),
-        sa.Column("settings", postgresql.JSONB(astext_type=sa.Text()),
-                  nullable=False, server_default=sa.text("'{}'::jsonb")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
+        sa.Column(
+            "settings",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=False,
+            server_default=sa.text("'{}'::jsonb"),
+        ),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
     )
 
     op.create_table(
         "notes",
         sa.Column("id", sa.Uuid(), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("user_id", sa.Uuid(),
-                  sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id", sa.Uuid(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        ),
         sa.Column("source_type", sa.String(16), nullable=False),
         sa.Column("raw_content", sa.Text(), nullable=True),
         sa.Column("processed_content", sa.Text(), nullable=True),
         sa.Column("summary", sa.Text(), nullable=True),
         sa.Column("title", sa.Text(), nullable=True),
         sa.Column("source_url", sa.Text(), nullable=True),
-        sa.Column("source_metadata", postgresql.JSONB(astext_type=sa.Text()),
-                  nullable=False, server_default=sa.text("'{}'::jsonb")),
-        sa.Column("blob_keys", postgresql.ARRAY(sa.Text()),
-                  nullable=False, server_default=sa.text("'{}'::text[]")),
-        sa.Column("created_at", sa.DateTime(timezone=True),
-                  nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "source_metadata",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=False,
+            server_default=sa.text("'{}'::jsonb"),
+        ),
+        sa.Column(
+            "blob_keys",
+            postgresql.ARRAY(sa.Text()),
+            nullable=False,
+            server_default=sa.text("'{}'::text[]"),
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.Column("captured_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("processed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("status", sa.String(16), nullable=False, server_default="pending"),
@@ -83,9 +104,7 @@ def upgrade() -> None:
         ["status"],
         postgresql_where=sa.text("status != 'ready'"),
     )
-    op.create_index(
-        "notes_tsv_idx", "notes", ["content_tsv"], postgresql_using="gin"
-    )
+    op.create_index("notes_tsv_idx", "notes", ["content_tsv"], postgresql_using="gin")
     op.create_index(
         "notes_trgm_idx",
         "notes",
@@ -97,21 +116,28 @@ def upgrade() -> None:
     op.create_table(
         "tags",
         sa.Column("id", sa.Uuid(), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("user_id", sa.Uuid(),
-                  sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id", sa.Uuid(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        ),
         sa.Column("name", sa.String(64), nullable=False),
         sa.Column("color", sa.String(16), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True),
-                  nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.UniqueConstraint("user_id", "name", name="uq_tags_user_id"),
     )
 
     op.create_table(
         "note_tags",
-        sa.Column("note_id", sa.Uuid(),
-                  sa.ForeignKey("notes.id", ondelete="CASCADE"), primary_key=True),
-        sa.Column("tag_id", sa.Uuid(),
-                  sa.ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True),
+        sa.Column(
+            "note_id", sa.Uuid(), sa.ForeignKey("notes.id", ondelete="CASCADE"), primary_key=True
+        ),
+        sa.Column(
+            "tag_id", sa.Uuid(), sa.ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True
+        ),
         sa.Column("confidence", sa.Float(), nullable=False, server_default="1.0"),
         sa.Column("source", sa.String(8), nullable=False, server_default="ai"),
         sa.CheckConstraint("source IN ('ai','user')", name="ck_note_tags_source_enum"),
@@ -120,8 +146,9 @@ def upgrade() -> None:
     op.create_table(
         "chunks",
         sa.Column("id", sa.Uuid(), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("note_id", sa.Uuid(),
-                  sa.ForeignKey("notes.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "note_id", sa.Uuid(), sa.ForeignKey("notes.id", ondelete="CASCADE"), nullable=False
+        ),
         sa.Column("chunk_index", sa.Integer(), nullable=False),
         sa.Column("content", sa.Text(), nullable=False),
         sa.Column("qdrant_point_id", sa.Uuid(), nullable=False),
@@ -132,24 +159,34 @@ def upgrade() -> None:
     op.create_table(
         "queries",
         sa.Column("id", sa.Uuid(), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("user_id", sa.Uuid(),
-                  sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id", sa.Uuid(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        ),
         sa.Column("query_text", sa.Text(), nullable=False),
         sa.Column("response_text", sa.Text(), nullable=True),
-        sa.Column("cited_note_ids", postgresql.ARRAY(sa.Uuid()),
-                  nullable=False, server_default=sa.text("'{}'::uuid[]")),
+        sa.Column(
+            "cited_note_ids",
+            postgresql.ARRAY(sa.Uuid()),
+            nullable=False,
+            server_default=sa.text("'{}'::uuid[]"),
+        ),
         sa.Column("latency_ms", sa.Integer(), nullable=True),
         sa.Column("model_used", sa.String(128), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True),
-                  nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.Column("user_feedback", sa.SmallInteger(), nullable=True),
     )
 
     op.create_table(
         "integrations",
         sa.Column("id", sa.Uuid(), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("user_id", sa.Uuid(),
-                  sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id", sa.Uuid(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        ),
         sa.Column("kind", sa.String(16), nullable=False),
         sa.Column("config_encrypted", sa.LargeBinary(), nullable=False),
         sa.Column("last_synced_at", sa.DateTime(timezone=True), nullable=True),
@@ -164,8 +201,12 @@ def upgrade() -> None:
     op.create_table(
         "idempotency_keys",
         sa.Column("key", sa.Text(), primary_key=True),
-        sa.Column("created_at", sa.DateTime(timezone=True),
-                  nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.Column("response_body", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     )
     op.create_index("idempotency_created_idx", "idempotency_keys", ["created_at"])

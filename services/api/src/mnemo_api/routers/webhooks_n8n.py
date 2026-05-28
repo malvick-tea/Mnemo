@@ -52,9 +52,7 @@ async def n8n_webhook(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> dict[str, Any]:
     try:
-        body, idem = await _verify_and_dedupe(
-            request, x_signature, x_timestamp, idempotency_key
-        )
+        body, idem = await _verify_and_dedupe(request, x_signature, x_timestamp, idempotency_key)
     except HTTPException:
         webhook_total.labels(event=event, outcome="rejected").inc()
         raise
@@ -130,9 +128,7 @@ async def _handle_note_ready(
 _FAIL_MSG_CAP = 2_000
 
 
-async def _handle_note_failed(
-    session: AsyncSession, payload: N8NNoteFailedIn
-) -> dict[str, Any]:
+async def _handle_note_failed(session: AsyncSession, payload: N8NNoteFailedIn) -> dict[str, Any]:
     note = await session.get(Note, payload.note_id)
     if note is None:
         return {"status": "not_found"}

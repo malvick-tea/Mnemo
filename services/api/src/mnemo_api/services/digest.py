@@ -49,7 +49,7 @@ async def daily_digest(
         "daily_digest_v1",
         date=day.isoformat(),
         today_notes=today_notes,
-        resurfaces=[],   # TODO(milestone-3): wire semantic resurfaces
+        resurfaces=[],  # TODO(milestone-3): wire semantic resurfaces
     )
     completion = await llm.chat(
         [Message(role="user", content=prompt)],
@@ -91,9 +91,7 @@ async def weekly_review(
         for n in rows.scalars()
     ]
 
-    prompt, fp = render_prompt(
-        "weekly_review_v1", date=end.date().isoformat(), notes=notes
-    )
+    prompt, fp = render_prompt("weekly_review_v1", date=end.date().isoformat(), notes=notes)
     completion = await llm.chat(
         [Message(role="user", content=prompt)],
         model=settings.model_rag,

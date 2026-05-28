@@ -37,9 +37,7 @@ async def capture_document(
     filename = doc.file_name or "document"
     mime = doc.mime_type or "application/octet-stream"
     if not _looks_supported(filename, mime):
-        await message.reply(
-            "❌ Unsupported document type. Send PDF, DOCX, EPUB, Markdown, or TXT."
-        )
+        await message.reply("❌ Unsupported document type. Send PDF, DOCX, EPUB, Markdown, or TXT.")
         return
 
     placeholder = await message.reply("📄 Parsing the document…")
@@ -66,7 +64,10 @@ async def capture_document(
     )
     log.info(
         "capture_document.queued",
-        note_id=note_id, filename=filename, mime=mime, bytes=len(body),
+        note_id=note_id,
+        filename=filename,
+        mime=mime,
+        bytes=len(body),
     )
 
 

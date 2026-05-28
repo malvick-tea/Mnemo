@@ -36,7 +36,8 @@ async def capture_text(
 ) -> CaptureResponse:
     try:
         note = await capture_svc.create_text_note(
-            session, redis,
+            session,
+            redis,
             user=user,
             content=payload.content,
             captured_at=payload.captured_at,
@@ -60,7 +61,8 @@ async def capture_url(
 ) -> CaptureResponse:
     try:
         note = await capture_svc.create_url_note(
-            session, redis,
+            session,
+            redis,
             user=user,
             url=str(payload.url),
             captured_at=payload.captured_at,
@@ -93,7 +95,8 @@ async def capture_voice(
     try:
         _put_object(minio, settings.minio_bucket, blob_key, body, file.content_type)
         note = await capture_svc.create_voice_note(
-            session, redis,
+            session,
+            redis,
             user=user,
             blob_key=blob_key,
             captured_at=captured_at,
@@ -132,7 +135,8 @@ async def capture_photo(
     try:
         _put_object(minio, settings.minio_bucket, blob_key, body, mime)
         note = await capture_svc.create_photo_note(
-            session, redis,
+            session,
+            redis,
             user=user,
             blob_key=blob_key,
             caption=caption,
@@ -148,14 +152,16 @@ async def capture_photo(
     return CaptureResponse(note_id=note.id, status=note.status)  # type: ignore[arg-type]
 
 
-_ALLOWED_DOC_MIMES = frozenset({
-    "application/pdf",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "application/epub+zip",
-    "text/plain",
-    "text/markdown",
-    "application/octet-stream",  # Telegram sometimes sends this for .md
-})
+_ALLOWED_DOC_MIMES = frozenset(
+    {
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/epub+zip",
+        "text/plain",
+        "text/markdown",
+        "application/octet-stream",  # Telegram sometimes sends this for .md
+    }
+)
 
 
 @router.post("/document", response_model=CaptureResponse, status_code=201)
@@ -177,14 +183,13 @@ async def capture_document(
     filename = file.filename or "document"
     if mime not in _ALLOWED_DOC_MIMES and not _has_known_ext(filename):
         capture_total.labels(source_type="document", outcome="rejected").inc()
-        raise HTTPException(
-            415, f"Unsupported document type: {mime} ({filename})"
-        )
+        raise HTTPException(415, f"Unsupported document type: {mime} ({filename})")
     blob_key = _build_blob_key(user.id, filename)
     try:
         _put_object(minio, settings.minio_bucket, blob_key, body, mime)
         note = await capture_svc.create_document_note(
-            session, redis,
+            session,
+            redis,
             user=user,
             blob_key=blob_key,
             filename=filename,
@@ -211,7 +216,8 @@ async def capture_forward(
     forward_meta = payload.forward.model_dump(mode="json", exclude_none=True)
     try:
         note = await capture_svc.create_forward_note(
-            session, redis,
+            session,
+            redis,
             user=user,
             content=payload.content,
             forward_metadata=forward_meta,
@@ -238,9 +244,7 @@ def _has_known_ext(filename: str) -> bool:
 
 
 def _build_blob_key(user_id: UUID, filename: str) -> str:
-    return (
-        f"{user_id}/{datetime.now(UTC):%Y/%m}/{uuid4()}/{filename}"
-    )
+    return f"{user_id}/{datetime.now(UTC):%Y/%m}/{uuid4()}/{filename}"
 
 
 async def _read_capped(upload: UploadFile, max_mb: int) -> bytes:

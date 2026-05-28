@@ -44,6 +44,4 @@ async def enqueue(redis: Redis, task: str, payload: dict[str, Any]) -> None:
 
 async def trigger_n8n(redis: Redis, workflow: str, **payload: Any) -> None:
     """Convenience wrapper for the n8n trigger actor."""
-    await enqueue(
-        redis, "trigger_n8n_workflow", {"workflow": workflow, **payload}
-    )
+    await enqueue(redis, "trigger_n8n_workflow", {"workflow": workflow, **payload})

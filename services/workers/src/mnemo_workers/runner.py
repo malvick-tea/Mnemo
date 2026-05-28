@@ -8,12 +8,12 @@ event loop per worker process via `asyncio.run`.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
-from typing import TypeVar
+from collections.abc import Callable, Coroutine
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 
 
-def run(coro_factory: Callable[..., Awaitable[T]], *args: object, **kwargs: object) -> T:
+def run(coro_factory: Callable[..., Coroutine[Any, Any, T]], *args: object, **kwargs: object) -> T:
     """Run an async task body to completion in a fresh event loop."""
     return asyncio.run(coro_factory(*args, **kwargs))

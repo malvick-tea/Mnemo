@@ -18,7 +18,6 @@ from uuid import UUID
 from aiogram import F, Router
 from aiogram.filters import Command, CommandObject
 from aiogram.types import CallbackQuery, Message
-from sqlalchemy import select
 
 from mnemo_bot.api_client import ApiClient
 from mnemo_bot.logging import get_logger
@@ -90,18 +89,14 @@ async def anki_callback(
         await cb.message.answer(_format_cards(result.get("cards", [])))
 
 
-async def _resolve_note(
-    api: ApiClient, tg_user_id: int, short_id: str
-) -> UUID | None:
+async def _resolve_note(api: ApiClient, tg_user_id: int, short_id: str) -> UUID | None:
     """List recent notes and look up the one matching `short_id`.
 
     Falls back through the API to avoid storing a separate short_id→uuid
     mapping. 100 most-recent should cover any realistic /anki workflow.
     """
     try:
-        notes = await api._request(  # noqa: SLF001 (small helper, ok)
-            tg_user_id, "GET", "/v1/notes?limit=100"
-        )
+        notes = await api._request(tg_user_id, "GET", "/v1/notes?limit=100")
     except Exception:
         log.exception("anki.list_notes.failed", tg_user_id=tg_user_id)
         return None
@@ -122,14 +117,6 @@ def _format_cards(cards: list[dict[str, Any]]) -> str:
         if kind == "cloze":
             lines.append(f"{i}. (cloze) {card.get('text', '')}")
         else:
-            lines.append(
-                f"{i}. Q: {card.get('front', '')}\n"
-                f"   A: {card.get('back', '')}"
-            )
+            lines.append(f"{i}. Q: {card.get('front', '')}\n" f"   A: {card.get('back', '')}")
     body = "\n\n".join(lines)
     return body[:4_000]
-
-
-# Re-export the select symbol so a future feature (filtering by content
-# fingerprint) can pick it up without re-importing.
-_ = select

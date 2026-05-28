@@ -29,7 +29,7 @@ _CLOZE_RE = re.compile(r"\{\{c\d+::[^{}]+\}\}")
 
 @dataclass(slots=True)
 class AnkiCard:
-    type: str       # "basic" | "cloze"
+    type: str  # "basic" | "cloze"
     front: str | None = None
     back: str | None = None
     text: str | None = None
@@ -56,9 +56,7 @@ async def generate_cards(
 ) -> AnkiCardsResult:
     settings = get_settings()
     note = (
-        await session.execute(
-            select(Note).where(Note.id == note_id, Note.user_id == user_id)
-        )
+        await session.execute(select(Note).where(Note.id == note_id, Note.user_id == user_id))
     ).scalar_one_or_none()
     if note is None:
         raise NotFoundError(f"Note {note_id} not found")
@@ -68,7 +66,9 @@ async def generate_cards(
         return AnkiCardsResult(note_id=note_id, cards=[], model_used=settings.model_rag)
 
     prompt, fp = render_prompt(
-        "anki_cards_v1", title=note.title, content=content[:8_000],
+        "anki_cards_v1",
+        title=note.title,
+        content=content[:8_000],
     )
     try:
         completion = await llm.chat(
@@ -79,13 +79,11 @@ async def generate_cards(
             response_format="json",
             prompt_fingerprint=fp,
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise ProviderError(f"Anki LLM call failed: {exc}") from exc
 
     cards = _parse_cards(completion.text)
-    return AnkiCardsResult(
-        note_id=note_id, cards=cards, model_used=completion.model
-    )
+    return AnkiCardsResult(note_id=note_id, cards=cards, model_used=completion.model)
 
 
 def _parse_cards(raw: str) -> list[AnkiCard]:

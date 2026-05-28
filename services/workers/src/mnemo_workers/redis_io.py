@@ -5,9 +5,8 @@ from __future__ import annotations
 import json
 from uuid import UUID
 
-from redis.asyncio import Redis
-
 from mnemo_api.config import get_settings
+from redis.asyncio import Redis
 
 
 def get_redis() -> Redis:
@@ -42,9 +41,7 @@ def digest_channel(user_id: UUID) -> str:
     return f"digest.daily.{user_id}"
 
 
-async def publish_digest(
-    redis: Redis, *, user_id: UUID, tg_user_id: int, text: str
-) -> None:
+async def publish_digest(redis: Redis, *, user_id: UUID, tg_user_id: int, text: str) -> None:
     await redis.publish(
         digest_channel(user_id),
         json.dumps({"user_id": str(user_id), "tg_user_id": tg_user_id, "text": text}),

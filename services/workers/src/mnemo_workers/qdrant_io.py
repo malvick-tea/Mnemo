@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from qdrant_client import AsyncQdrantClient
-from qdrant_client.http.models import PointStruct
-
 from mnemo_api.config import get_settings
 from mnemo_api.models import Chunk, Note
+from qdrant_client import AsyncQdrantClient
+from qdrant_client.http.models import PointStruct
 
 
 def get_qdrant_client() -> AsyncQdrantClient:

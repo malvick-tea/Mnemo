@@ -9,10 +9,10 @@ without this sweep.
 from __future__ import annotations
 
 import dramatiq
-from sqlalchemy import text
-
 from mnemo_api.db import session_factory
 from mnemo_api.logging import get_logger
+from sqlalchemy import text
+
 from mnemo_workers.runner import run
 
 log = get_logger(__name__)
@@ -26,10 +26,7 @@ def run_idempotency_cleanup() -> None:
 async def _purge_old_idempotency_keys() -> None:
     async with session_factory()() as session:
         result = await session.execute(
-            text(
-                "DELETE FROM idempotency_keys "
-                "WHERE created_at < now() - interval '24 hours'"
-            )
+            text("DELETE FROM idempotency_keys " "WHERE created_at < now() - interval '24 hours'")
         )
         await session.commit()
         log.info(

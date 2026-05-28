@@ -12,6 +12,7 @@ __pycache__/
 *$py.class
 *.egg-info/
 .pytest_cache/
+.hypothesis/
 .mypy_cache/
 .ruff_cache/
 .coverage
@@ -28,6 +29,7 @@ venv/
 # uv
 # services lock files are tracked; root lock is not
 /uv.lock
+.uv-cache/
 
 # IDE
 .vscode/

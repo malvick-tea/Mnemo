@@ -77,7 +77,9 @@ class OllamaClient:
         if prompt_tokens:
             llm_tokens_total.labels(direction="prompt", provider=_PROVIDER).inc(prompt_tokens)
         if completion_tokens:
-            llm_tokens_total.labels(direction="completion", provider=_PROVIDER).inc(completion_tokens)
+            llm_tokens_total.labels(direction="completion", provider=_PROVIDER).inc(
+                completion_tokens
+            )
         return CompletionResult(
             text=data.get("message", {}).get("content", ""),
             model=model,

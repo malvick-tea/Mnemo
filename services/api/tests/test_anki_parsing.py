@@ -52,11 +52,6 @@ def test_invalid_json_returns_empty() -> None:
 
 def test_caps_at_twenty_cards() -> None:
     raw = json.dumps(
-        {
-            "cards": [
-                {"type": "basic", "front": f"Q{i}", "back": f"A{i}"}
-                for i in range(50)
-            ]
-        }
+        {"cards": [{"type": "basic", "front": f"Q{i}", "back": f"A{i}"} for i in range(50)]}
     )
     assert len(_parse_cards(raw)) == 20

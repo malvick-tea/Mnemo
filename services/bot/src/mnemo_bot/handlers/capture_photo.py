@@ -43,9 +43,7 @@ async def capture_photo(
     caption = (message.caption or "").strip() or None
 
     try:
-        result = await api.capture_photo(
-            tg_user_id, body, filename, mime, caption=caption
-        )
+        result = await api.capture_photo(tg_user_id, body, filename, mime, caption=caption)
     except Exception:
         log.exception("capture_photo.api_failed", tg_user_id=tg_user_id)
         await placeholder.edit_text("❌ Couldn't queue that photo.")
@@ -59,5 +57,8 @@ async def capture_photo(
     )
     log.info(
         "capture_photo.queued",
-        note_id=note_id, bytes=len(body), w=largest.width, h=largest.height,
+        note_id=note_id,
+        bytes=len(body),
+        w=largest.width,
+        h=largest.height,
     )

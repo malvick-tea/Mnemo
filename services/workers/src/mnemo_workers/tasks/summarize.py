@@ -5,13 +5,13 @@ from __future__ import annotations
 from uuid import UUID
 
 import dramatiq
-
 from mnemo_api.config import get_settings
 from mnemo_api.db import session_factory
 from mnemo_api.llm import make_llm
 from mnemo_api.logging import get_logger
 from mnemo_api.models import Note
 from mnemo_api.services.summarize import summarize
+
 from mnemo_workers.runner import run
 
 log = get_logger(__name__)

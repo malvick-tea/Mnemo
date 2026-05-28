@@ -12,15 +12,15 @@ from __future__ import annotations
 from uuid import UUID
 
 import dramatiq
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from mnemo_api.config import get_settings
 from mnemo_api.db import session_factory
 from mnemo_api.llm import make_embedder
 from mnemo_api.logging import get_logger
 from mnemo_api.models import Chunk, Note, NoteTag, Tag
 from mnemo_api.services.chunking import split_into_chunks
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from mnemo_workers.qdrant_io import get_qdrant_client, upsert_chunks
 from mnemo_workers.runner import run
 
@@ -47,10 +47,14 @@ async def _embed_note(note_id: UUID) -> None:
                 return
 
             existing_rows = (
-                await session.execute(
-                    select(Chunk).where(Chunk.note_id == note.id).order_by(Chunk.chunk_index)
+                (
+                    await session.execute(
+                        select(Chunk).where(Chunk.note_id == note.id).order_by(Chunk.chunk_index)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             for c in existing_rows:
                 await session.delete(c)
             await session.flush()
@@ -83,19 +87,19 @@ async def _embed_note(note_id: UUID) -> None:
             await session.commit()
             log.info(
                 "embed.ok",
-                note_id=str(note_id), chunks=len(new_rows), tags=len(tags),
+                note_id=str(note_id),
+                chunks=len(new_rows),
+                tags=len(tags),
             )
     finally:
-        for c in (embedder, qdrant):
-            close = getattr(c, "aclose", None)
+        for close_target in (embedder, qdrant):
+            close = getattr(close_target, "aclose", None)
             if callable(close):
                 await close()
 
 
 async def _tag_names(session: AsyncSession, note_id: UUID) -> list[str]:
     rows = await session.execute(
-        select(Tag.name)
-        .join(NoteTag, NoteTag.tag_id == Tag.id)
-        .where(NoteTag.note_id == note_id)
+        select(Tag.name).join(NoteTag, NoteTag.tag_id == Tag.id).where(NoteTag.note_id == note_id)
     )
     return [r.name for r in rows]

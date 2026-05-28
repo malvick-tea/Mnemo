@@ -16,11 +16,12 @@ from mnemo_api.models.base import Base
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[UUID] = mapped_column(primary_key=True, default_factory=uuid4)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default_factory=uuid4, init=False)
     tg_user_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
     tg_username: Mapped[str | None] = mapped_column(String(64), default=None)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(),
+        DateTime(timezone=True),
+        server_default=func.now(),
         default_factory=lambda: datetime.now(UTC),
     )
     settings: Mapped[dict[str, Any]] = mapped_column(

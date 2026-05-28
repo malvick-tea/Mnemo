@@ -10,11 +10,20 @@ from __future__ import annotations
 from mnemo_api import metrics
 
 
+def _sample_names(collector: object) -> set[str]:
+    return {
+        sample.name
+        for metric in collector.collect()  # type: ignore[attr-defined]
+        for sample in metric.samples
+    }
+
+
 def test_capture_total_labels() -> None:
     metrics.capture_total.labels(source_type="text", outcome="ok").inc()
     metrics.capture_total.labels(source_type="voice", outcome="error").inc()
-    # Smoke: no exception means label cardinality is honoured.
-    assert metrics.capture_total._name == "mnemo_capture_total"
+    # Smoke: no exception means label cardinality is honoured. Counter._name
+    # intentionally stores the base name without Prometheus' exported _total.
+    assert "mnemo_capture_total" in _sample_names(metrics.capture_total)
 
 
 def test_query_total_outcomes() -> None:

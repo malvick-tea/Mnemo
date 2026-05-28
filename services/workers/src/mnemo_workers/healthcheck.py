@@ -9,9 +9,8 @@ from __future__ import annotations
 import asyncio
 import sys
 
-from redis.asyncio import Redis
-
 from mnemo_api.config import get_settings
+from redis.asyncio import Redis
 
 
 async def _main() -> int:
@@ -20,7 +19,7 @@ async def _main() -> int:
         pong = await r.ping()
         await r.aclose()
         return 0 if pong else 1
-    except Exception:  # noqa: BLE001
+    except Exception:
         return 1
 
 

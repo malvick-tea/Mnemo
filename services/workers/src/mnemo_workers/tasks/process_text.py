@@ -18,8 +18,6 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 import dramatiq
-from sqlalchemy import select
-
 from mnemo_api.config import get_settings
 from mnemo_api.db import session_factory
 from mnemo_api.llm import make_embedder, make_llm
@@ -28,6 +26,8 @@ from mnemo_api.models import Chunk, Note, NoteStatus, User
 from mnemo_api.services.chunking import split_into_chunks
 from mnemo_api.services.summarize import summarize
 from mnemo_api.services.tagging import suggest_and_apply_tags
+from sqlalchemy import select
+
 from mnemo_workers.qdrant_io import get_qdrant_client, upsert_chunks
 from mnemo_workers.redis_io import get_redis, publish_note_ready
 from mnemo_workers.runner import run
@@ -78,20 +78,25 @@ async def _process_text_note(note_id: UUID) -> None:
             if note.summary is None:
                 try:
                     note.summary = await summarize(
-                        llm, content=content, source_type=note.source_type,
+                        llm,
+                        content=content,
+                        source_type=note.source_type,
                         title_hint=note.title,
                     )
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     log.exception("process_text.summarize.failed", note_id=str(note_id))
                     note.error_message = f"summary: {exc}"[:1_000]
 
             applied_tags: list[str] = []
             try:
                 applied_tags = await suggest_and_apply_tags(
-                    session, llm,
-                    note_id=note.id, user_id=note.user_id, content=content,
+                    session,
+                    llm,
+                    note_id=note.id,
+                    user_id=note.user_id,
+                    content=content,
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 log.exception("process_text.tagging.failed", note_id=str(note_id))
 
             chunks_in = split_into_chunks(content)
@@ -99,7 +104,7 @@ async def _process_text_note(note_id: UUID) -> None:
             if chunks_in:
                 vectors = await embedder.embed([c.content for c in chunks_in])
                 chunk_rows: list[Chunk] = []
-                for c, vec in zip(chunks_in, vectors, strict=True):
+                for c, _vec in zip(chunks_in, vectors, strict=True):
                     chunk_rows.append(
                         Chunk(
                             note_id=note.id,
@@ -136,10 +141,8 @@ async def _process_text_note(note_id: UUID) -> None:
                     tg_user_id=tg_user_id,
                     note_id=note_id,
                 )
-            except Exception:  # noqa: BLE001
-                log.exception(
-                    "process_text.publish_failed", note_id=str(note_id)
-                )
+            except Exception:
+                log.exception("process_text.publish_failed", note_id=str(note_id))
         for component in (llm, embedder, qdrant):
             close = getattr(component, "aclose", None)
             if callable(close):

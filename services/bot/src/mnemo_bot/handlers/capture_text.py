@@ -23,7 +23,7 @@ log = get_logger(__name__)
 router = Router(name="capture_text")
 
 _URL_RE = re.compile(r"https?://\S+")
-_PLACEHOLDER_TTL = 60 * 30   # 30 min
+_PLACEHOLDER_TTL = 60 * 30  # 30 min
 
 
 def _has_url(text: str) -> bool:
@@ -75,9 +75,7 @@ async def _capture(
         result = await api.capture_text(tg_user_id, text)
     except Exception:
         log.exception("capture_text.api_failed", tg_user_id=tg_user_id)
-        await placeholder.edit_text(
-            "❌ Couldn't reach Mnemo. Try again in a moment."
-        )
+        await placeholder.edit_text("❌ Couldn't reach Mnemo. Try again in a moment.")
         return
 
     note_id = result["note_id"]

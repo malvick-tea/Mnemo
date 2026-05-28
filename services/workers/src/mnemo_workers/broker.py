@@ -20,7 +20,6 @@ from dramatiq.middleware import (
     ShutdownNotifications,
     TimeLimit,
 )
-
 from mnemo_api.config import get_settings
 from mnemo_api.metrics import worker_task_seconds, worker_task_total
 
@@ -48,12 +47,11 @@ class MetricsMiddleware(Middleware):
     ) -> None:
         t0 = message.options.get("_mnemo_t0")
         if t0 is not None:
-            worker_task_seconds.labels(actor=message.actor_name).observe(
-                time.perf_counter() - t0
-            )
+            worker_task_seconds.labels(actor=message.actor_name).observe(time.perf_counter() - t0)
         outcome = "error" if exception is not None else "ok"
         worker_task_total.labels(
-            actor=message.actor_name, outcome=outcome,
+            actor=message.actor_name,
+            outcome=outcome,
         ).inc()
 
 

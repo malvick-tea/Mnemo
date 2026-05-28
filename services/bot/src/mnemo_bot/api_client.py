@@ -41,9 +41,7 @@ def _service_token(tg_user_id: int) -> str:
 
 class ApiClient:
     def __init__(self) -> None:
-        self._client = httpx.AsyncClient(
-            base_url=get_settings().api_base_url, timeout=60.0
-        )
+        self._client = httpx.AsyncClient(base_url=get_settings().api_base_url, timeout=60.0)
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -52,7 +50,9 @@ class ApiClient:
         self, tg_user_id: int, content: str, source_metadata: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         return await self._request(
-            tg_user_id, "POST", "/v1/capture/text",
+            tg_user_id,
+            "POST",
+            "/v1/capture/text",
             json={"content": content, "source_metadata": source_metadata or {}},
         )
 
@@ -60,7 +60,9 @@ class ApiClient:
         self, tg_user_id: int, url: str, source_metadata: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         return await self._request(
-            tg_user_id, "POST", "/v1/capture/url",
+            tg_user_id,
+            "POST",
+            "/v1/capture/url",
             json={"url": url, "source_metadata": source_metadata or {}},
         )
 
@@ -72,9 +74,7 @@ class ApiClient:
         content_type: str,
     ) -> dict[str, Any]:
         files = {"file": (filename, file_bytes, content_type)}
-        return await self._request(
-            tg_user_id, "POST", "/v1/capture/voice", files=files
-        )
+        return await self._request(tg_user_id, "POST", "/v1/capture/voice", files=files)
 
     async def capture_photo(
         self,
@@ -89,8 +89,11 @@ class ApiClient:
         if caption:
             data["caption"] = caption
         return await self._request(
-            tg_user_id, "POST", "/v1/capture/photo",
-            files=files, data=data,
+            tg_user_id,
+            "POST",
+            "/v1/capture/photo",
+            files=files,
+            data=data,
         )
 
     async def capture_document(
@@ -101,9 +104,7 @@ class ApiClient:
         content_type: str,
     ) -> dict[str, Any]:
         files = {"file": (filename, file_bytes, content_type)}
-        return await self._request(
-            tg_user_id, "POST", "/v1/capture/document", files=files
-        )
+        return await self._request(tg_user_id, "POST", "/v1/capture/document", files=files)
 
     async def capture_forward(
         self,
@@ -113,7 +114,9 @@ class ApiClient:
         source_metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         return await self._request(
-            tg_user_id, "POST", "/v1/capture/forward",
+            tg_user_id,
+            "POST",
+            "/v1/capture/forward",
             json={
                 "content": content,
                 "forward": forward,
@@ -128,34 +131,26 @@ class ApiClient:
 
     async def feedback(self, tg_user_id: int, query_id: UUID, rating: int) -> None:
         await self._request(
-            tg_user_id, "POST", f"/v1/query/{query_id}/feedback",
+            tg_user_id,
+            "POST",
+            f"/v1/query/{query_id}/feedback",
             json={"rating": rating},
         )
 
     async def digest_today(self, tg_user_id: int) -> dict[str, Any]:
-        return await self._request(
-            tg_user_id, "POST", "/v1/digest/today", json={"mode": "preview"}
-        )
+        return await self._request(tg_user_id, "POST", "/v1/digest/today", json={"mode": "preview"})
 
     async def get_settings(self, tg_user_id: int) -> dict[str, Any]:
         return await self._request(tg_user_id, "GET", "/v1/settings")
 
-    async def patch_settings(
-        self, tg_user_id: int, settings: dict[str, Any]
-    ) -> dict[str, Any]:
-        return await self._request(
-            tg_user_id, "PATCH", "/v1/settings", json={"settings": settings}
-        )
+    async def patch_settings(self, tg_user_id: int, settings: dict[str, Any]) -> dict[str, Any]:
+        return await self._request(tg_user_id, "PATCH", "/v1/settings", json={"settings": settings})
 
     async def get_note(self, tg_user_id: int, note_id: UUID) -> dict[str, Any]:
         return await self._request(tg_user_id, "GET", f"/v1/notes/{note_id}")
 
-    async def generate_anki(
-        self, tg_user_id: int, note_id: UUID
-    ) -> dict[str, Any]:
-        return await self._request(
-            tg_user_id, "POST", f"/v1/notes/{note_id}/anki"
-        )
+    async def generate_anki(self, tg_user_id: int, note_id: UUID) -> dict[str, Any]:
+        return await self._request(tg_user_id, "POST", f"/v1/notes/{note_id}/anki")
 
     async def _request(
         self, tg_user_id: int, method: str, path: str, **kwargs: Any
@@ -174,9 +169,7 @@ class ApiClient:
             reraise=True,
         ):
             with attempt:
-                resp = await self._client.request(
-                    method, path, headers=headers, **kwargs
-                )
+                resp = await self._client.request(method, path, headers=headers, **kwargs)
                 if 500 <= resp.status_code < 600:
                     raise httpx.RemoteProtocolError(f"api 5xx: {resp.status_code}")
                 resp.raise_for_status()

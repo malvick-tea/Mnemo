@@ -53,9 +53,7 @@ async def upsert_integration(
 ) -> IntegrationOut:
     blob = encrypt(json.dumps(payload.config).encode("utf-8"))
     res = await session.execute(
-        select(Integration).where(
-            Integration.user_id == user.id, Integration.kind == payload.kind
-        )
+        select(Integration).where(Integration.user_id == user.id, Integration.kind == payload.kind)
     )
     existing = res.scalar_one_or_none()
     if existing:
@@ -64,21 +62,23 @@ async def upsert_integration(
     else:
         session.add(
             Integration(
-                user_id=user.id, kind=payload.kind,
-                config_encrypted=blob, is_active=payload.is_active,
+                user_id=user.id,
+                kind=payload.kind,
+                config_encrypted=blob,
+                is_active=payload.is_active,
             )
         )
     await session.commit()
     return IntegrationOut(
-        kind=payload.kind, is_active=payload.is_active,
-        has_credentials=True, last_synced_at=None,
+        kind=payload.kind,
+        is_active=payload.is_active,
+        has_credentials=True,
+        last_synced_at=None,
     )
 
 
 @router.delete("/{kind}", status_code=204)
-async def disable_integration(
-    kind: Kind, user: CurrentUser, session: SessionDep
-) -> None:
+async def disable_integration(kind: Kind, user: CurrentUser, session: SessionDep) -> None:
     res = await session.execute(
         select(Integration).where(Integration.user_id == user.id, Integration.kind == kind)
     )
@@ -95,4 +95,4 @@ def _maybe_decrypt(integ: Integration) -> dict[str, Any]:
 
 
 # Re-exported for use by the worker layer.
-__all__ = ["router", "_maybe_decrypt"]
+__all__ = ["_maybe_decrypt", "router"]

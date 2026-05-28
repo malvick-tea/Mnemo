@@ -16,7 +16,7 @@ async def _main() -> int:
         pong = await r.ping()
         await r.aclose()
         return 0 if pong else 1
-    except Exception:  # noqa: BLE001
+    except Exception:
         return 1
 
 

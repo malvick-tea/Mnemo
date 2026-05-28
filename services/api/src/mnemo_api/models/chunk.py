@@ -14,7 +14,7 @@ class Chunk(Base):
     __tablename__ = "chunks"
     __table_args__ = (UniqueConstraint("note_id", "chunk_index"),)
 
-    id: Mapped[UUID] = mapped_column(primary_key=True, default_factory=uuid4)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default_factory=uuid4, init=False)
     note_id: Mapped[UUID] = mapped_column(
         ForeignKey("notes.id", ondelete="CASCADE"), nullable=False
     )

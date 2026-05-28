@@ -11,7 +11,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from mnemo_api.config import get_settings
-from mnemo_api.models import Base  # noqa: F401 — registers all models
+from mnemo_api.models import Base
 
 config = context.config
 if config.config_file_name is not None:

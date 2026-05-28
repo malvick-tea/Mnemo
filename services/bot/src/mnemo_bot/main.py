@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from typing import Any
 
 from aiogram import Bot, Dispatcher
@@ -82,10 +82,8 @@ async def _run_polling() -> None:
             await dp.start_polling(bot)
         finally:
             listener.cancel()
-            try:
+            with suppress(asyncio.CancelledError):
                 await listener
-            except asyncio.CancelledError:
-                pass
 
 
 async def _run_webhook() -> None:
@@ -99,9 +97,7 @@ async def _run_webhook() -> None:
             setup_application,
         )
 
-        SimpleRequestHandler(dispatcher=dp, bot=bot).register(
-            app, path=s.tg_webhook_path
-        )
+        SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=s.tg_webhook_path)
         setup_application(app, dp, bot=bot)
 
         public_url = f"https://{s.domain}{s.tg_webhook_path}"

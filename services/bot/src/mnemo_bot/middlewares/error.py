@@ -35,16 +35,16 @@ class ErrorMiddleware(BaseMiddleware):
                 f"Reference: `{cid[:12]}`"
             )
             if isinstance(event, Message):
-                with _safe_send():
+                with _SafeSend():
                     await event.reply(msg)
             elif isinstance(event, CallbackQuery):
-                with _safe_send():
+                with _SafeSend():
                     await event.answer(msg, show_alert=True)
             # Don't re-raise — we already logged.
             return None
 
 
-class _safe_send:
+class _SafeSend:
     """Suppress secondary errors while reporting the primary one."""
 
     def __enter__(self) -> None:

@@ -19,12 +19,12 @@ import re
 from uuid import UUID
 
 import dramatiq
-from sqlalchemy import select
-
 from mnemo_api.db import session_factory
 from mnemo_api.logging import get_logger
 from mnemo_api.models import Note, NoteStatus
 from mnemo_api.services.queue import enqueue
+from sqlalchemy import select
+
 from mnemo_workers.minio_io import download_blob
 from mnemo_workers.redis_io import get_redis
 from mnemo_workers.runner import run
@@ -37,9 +37,7 @@ def process_document_note(note_id: str, blob_key: str, filename: str) -> None:
     run(_process_document_note, UUID(note_id), blob_key, filename)
 
 
-async def _process_document_note(
-    note_id: UUID, blob_key: str, filename: str
-) -> None:
+async def _process_document_note(note_id: UUID, blob_key: str, filename: str) -> None:
     redis = get_redis()
     try:
         async with session_factory()() as session:
@@ -54,17 +52,17 @@ async def _process_document_note(
 
         try:
             blob = download_blob(blob_key)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.exception("document.download.failed", note_id=str(note_id))
             await _fail(note_id, f"download: {exc}")
             return
 
         try:
             text, doc_kind = _extract(blob, filename)
-        except UnsupportedDocument as exc:
+        except UnsupportedDocumentError as exc:
             await _fail(note_id, str(exc))
             return
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.exception("document.parse.failed", note_id=str(note_id), filename=filename)
             await _fail(note_id, f"parse: {exc}")
             return
@@ -91,13 +89,15 @@ async def _process_document_note(
         await enqueue(redis, "process_text_note", {"note_id": str(note_id)})
         log.info(
             "document.parsed",
-            note_id=str(note_id), kind=doc_kind, chars=len(text),
+            note_id=str(note_id),
+            kind=doc_kind,
+            chars=len(text),
         )
     finally:
         await redis.aclose()
 
 
-class UnsupportedDocument(Exception):
+class UnsupportedDocumentError(Exception):
     pass
 
 
@@ -118,9 +118,8 @@ def _extract(blob: bytes, filename: str) -> tuple[str, str]:
         None,
     )
     if kind is None:
-        raise UnsupportedDocument(
-            f"Unsupported document extension: {filename!r}. "
-            "Supported: .pdf .docx .epub .md .txt"
+        raise UnsupportedDocumentError(
+            f"Unsupported document extension: {filename!r}. " "Supported: .pdf .docx .epub .md .txt"
         )
 
     if kind == "pdf":
@@ -143,7 +142,7 @@ def _extract_pdf(blob: bytes) -> str:
     for page in reader.pages:
         try:
             parts.append(page.extract_text() or "")
-        except Exception:  # noqa: BLE001 — one bad page shouldn't kill the doc
+        except Exception:
             parts.append("")
     return "\n\n".join(p for p in parts if p.strip())
 
@@ -177,6 +176,7 @@ def _extract_epub(blob: bytes) -> str:
         return "\n\n".join(chapters)
     finally:
         import os
+
         os.unlink(path)
 
 
@@ -186,7 +186,7 @@ def _extract_markdown(blob: bytes) -> str:
 
     md_text = blob.decode("utf-8", errors="replace")
     html = markdown.markdown(md_text, extensions=["fenced_code", "tables"])
-    return BeautifulSoup(html, "html.parser").get_text(separator="\n").strip()
+    return str(BeautifulSoup(html, "html.parser").get_text(separator="\n").strip())
 
 
 _WS_RE = re.compile(r"[ \t]+")
@@ -201,9 +201,7 @@ def _normalize_whitespace(text: str) -> str:
 
 async def _fail(note_id: UUID, message: str) -> None:
     async with session_factory()() as session:
-        note = (
-            await session.execute(select(Note).where(Note.id == note_id))
-        ).scalar_one_or_none()
+        note = (await session.execute(select(Note).where(Note.id == note_id))).scalar_one_or_none()
         if note is None:
             return
         note.status = NoteStatus.failed.value

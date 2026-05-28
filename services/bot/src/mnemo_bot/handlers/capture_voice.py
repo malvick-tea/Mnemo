@@ -39,10 +39,7 @@ async def capture_voice(
         return
 
     body = buf.read()
-    filename = (
-        getattr(file_obj, "file_name", None)
-        or f"voice-{file_obj.file_id}.ogg"
-    )
+    filename = getattr(file_obj, "file_name", None) or f"voice-{file_obj.file_id}.ogg"
     mime = getattr(file_obj, "mime_type", None) or "audio/ogg"
 
     try:

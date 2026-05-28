@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 
 from mnemo_workers.tasks.process_document import (
-    UnsupportedDocument,
+    UnsupportedDocumentError,
     _extract,
     _extract_markdown,
     _normalize_whitespace,
@@ -19,12 +19,12 @@ from mnemo_workers.tasks.process_document import (
 
 
 def test_unsupported_extension_rejected() -> None:
-    with pytest.raises(UnsupportedDocument):
+    with pytest.raises(UnsupportedDocumentError):
         _extract(b"x", "song.mp3")
 
 
 def test_text_passthrough() -> None:
-    text, kind = _extract("hello world\n".encode(), "notes.txt")
+    text, kind = _extract(b"hello world\n", "notes.txt")
     assert kind == "text"
     assert "hello world" in text
 

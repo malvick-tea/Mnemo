@@ -6,6 +6,7 @@ See ADR-002 for the rationale (no per-corpus tuning required).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TypedDict
 from uuid import UUID
 
 from qdrant_client import AsyncQdrantClient
@@ -30,7 +31,7 @@ class SearchHit:
     chunk_id: UUID
     score: float
     rrf_score: float
-    source: tuple[str, ...]   # which retrievers contributed ("vec","fts")
+    source: tuple[str, ...]  # which retrievers contributed ("vec","fts")
     content: str
     title: str | None
     captured_at: str
@@ -43,6 +44,15 @@ class _FusionEntry:
     note_id: UUID
     score: float = 0.0
     sources: set[str] = field(default_factory=set)
+
+
+class _ChunkMeta(TypedDict):
+    content: str
+    title: str | None
+    captured_at: str
+    source_type: str
+    source_url: str | None
+    score: float
 
 
 async def hybrid_search(
@@ -163,9 +173,7 @@ def _rrf_fuse(
     return fused
 
 
-async def _hydrate_chunks(
-    session: AsyncSession, chunk_ids: list[UUID]
-) -> dict[UUID, dict[str, object]]:
+async def _hydrate_chunks(session: AsyncSession, chunk_ids: list[UUID]) -> dict[UUID, _ChunkMeta]:
     if not chunk_ids:
         return {}
     rows = await session.execute(
@@ -179,7 +187,7 @@ async def _hydrate_chunks(
         ),
         {"ids": chunk_ids},
     )
-    out: dict[UUID, dict[str, object]] = {}
+    out: dict[UUID, _ChunkMeta] = {}
     for r in rows:
         out[r.id] = {
             "content": r.content,

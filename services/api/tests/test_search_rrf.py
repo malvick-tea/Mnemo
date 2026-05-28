@@ -46,6 +46,6 @@ def test_rrf_tracks_sources() -> None:
     vec = _chunk_ranking([(c1, n1), (c2, n2)])
     fts = _chunk_ranking([(c1, n1)])  # c1 in both, c2 only in vec
     fused = _rrf_fuse(rankings=[vec, fts], labels=("vec", "fts"), k=60)
-    by_chunk = {chunk_id: entry for chunk_id, entry in fused}
+    by_chunk = dict(fused)
     assert by_chunk[c1].sources == {"vec", "fts"}
     assert by_chunk[c2].sources == {"vec"}

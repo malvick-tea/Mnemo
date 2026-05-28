@@ -27,6 +27,7 @@ class ForwardMetadata(BaseModel):
     All fields optional because Telegram sometimes strips author info (e.g.
     forwards from channels with hidden senders).
     """
+
     origin_type: Literal["user", "chat", "channel", "hidden_user"] | None = None
     from_user_id: int | None = None
     from_user_name: str | None = None

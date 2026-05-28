@@ -166,7 +166,9 @@ async def create_document_note(
     )
     log.info(
         "capture.document.created",
-        note_id=str(note.id), blob_key=blob_key, filename=filename,
+        note_id=str(note.id),
+        blob_key=blob_key,
+        filename=filename,
     )
     return note
 
@@ -199,7 +201,8 @@ async def create_forward_note(
     await enqueue(redis, "process_text_note", {"note_id": str(note.id)})
     log.info(
         "capture.forward.created",
-        note_id=str(note.id), len=len(content),
+        note_id=str(note.id),
+        len=len(content),
         origin=forward_metadata.get("origin_type"),
     )
     return note

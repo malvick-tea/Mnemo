@@ -19,13 +19,13 @@ from pathlib import Path
 from uuid import UUID
 
 import dramatiq
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from mnemo_api.crypto import decrypt
 from mnemo_api.db import session_factory
 from mnemo_api.logging import get_logger
 from mnemo_api.models import Integration, Note, NoteStatus, NoteTag, Tag
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from mnemo_workers.runner import run
 
 log = get_logger(__name__)
@@ -52,7 +52,7 @@ async def _run_for_all() -> None:
     for integ in integrations:
         try:
             await _export_user(integ.user_id, integ.id)
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.exception("obsidian.export.user_failed", user_id=str(integ.user_id))
 
 
@@ -63,22 +63,23 @@ async def _export_user(user_id: UUID, integration_id: UUID) -> None:
             return
         try:
             config = json.loads(decrypt(integ.config_encrypted).decode("utf-8"))
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning(
                 "obsidian.export.bad_credentials",
-                user_id=str(user_id), error=str(exc),
+                user_id=str(user_id),
+                error=str(exc),
             )
             return
 
-        vault_root = Path(
-            config.get("vault_path") or f"{_DEFAULT_VAULT_ROOT}/{user_id}"
-        )
+        vault_root = Path(config.get("vault_path") or f"{_DEFAULT_VAULT_ROOT}/{user_id}")
         try:
             vault_root.mkdir(parents=True, exist_ok=True)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning(
                 "obsidian.export.vault_unavailable",
-                user_id=str(user_id), vault=str(vault_root), error=str(exc),
+                user_id=str(user_id),
+                vault=str(vault_root),
+                error=str(exc),
             )
             return
 
@@ -91,10 +92,11 @@ async def _export_user(user_id: UUID, integration_id: UUID) -> None:
             try:
                 _write_markdown(vault_root, note, tags)
                 written += 1
-            except Exception:  # noqa: BLE001
+            except Exception:
                 log.exception(
                     "obsidian.export.write_failed",
-                    user_id=str(user_id), note_id=str(note.id),
+                    user_id=str(user_id),
+                    note_id=str(note.id),
                 )
 
         integ.last_synced_at = datetime.now(UTC)
@@ -108,9 +110,7 @@ async def _export_user(user_id: UUID, integration_id: UUID) -> None:
         )
 
 
-async def _select_notes(
-    session: AsyncSession, user_id: UUID, since: datetime
-) -> list[Note]:
+async def _select_notes(session: AsyncSession, user_id: UUID, since: datetime) -> list[Note]:
     rows = await session.execute(
         select(Note)
         .where(
@@ -126,9 +126,7 @@ async def _select_notes(
 
 async def _tags_for(session: AsyncSession, note_id: UUID) -> list[str]:
     rows = await session.execute(
-        select(Tag.name)
-        .join(NoteTag, NoteTag.tag_id == Tag.id)
-        .where(NoteTag.note_id == note_id)
+        select(Tag.name).join(NoteTag, NoteTag.tag_id == Tag.id).where(NoteTag.note_id == note_id)
     )
     return [r.name for r in rows]
 
