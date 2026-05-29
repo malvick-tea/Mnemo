@@ -43,6 +43,12 @@ services:
       - caddy_config:/config
     environment:
       MNEMO_DOMAIN: ${MNEMO_DOMAIN}
+      # The Telegram webhook route in the Caddyfile is a per-install secret
+      # prefix ({$TELEGRAM_WEBHOOK_PATH}). Without it Caddy expands the
+      # placeholder to an empty string, collapsing the route to `handle_path *`
+      # which proxies *everything* to the bot and destroys the secret-path
+      # boundary. It MUST be passed through.
+      TELEGRAM_WEBHOOK_PATH: ${TELEGRAM_WEBHOOK_PATH}
       N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER}
       # Caddy reads the bcrypt hash from .env; bootstrap.sh generates it.
       N8N_BASIC_AUTH_PASSWORD_HASH: ${N8N_BASIC_AUTH_PASSWORD_HASH:-}

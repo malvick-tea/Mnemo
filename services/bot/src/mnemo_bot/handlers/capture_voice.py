@@ -11,6 +11,7 @@ from redis.asyncio import Redis
 
 from mnemo_bot.api_client import ApiClient
 from mnemo_bot.logging import get_logger
+from mnemo_bot.uploads import exceeds_limit
 
 log = get_logger(__name__)
 router = Router(name="capture_voice")
@@ -25,12 +26,15 @@ async def capture_voice(
     redis: Redis,
     tg_user_id: int,
 ) -> None:
-    placeholder = await message.reply("🎙 Transcribing… this can take ~30 s.")
-
     file_obj = message.voice or message.audio
     if file_obj is None:
-        await placeholder.edit_text("❌ No audio attached.")
+        await message.reply("❌ No audio attached.")
         return
+    if exceeds_limit(file_obj.file_size):
+        await message.reply("❌ That audio file is too large.")
+        return
+
+    placeholder = await message.reply("🎙 Transcribing… this can take ~30 s.")
 
     file_info = await message.bot.get_file(file_obj.file_id)  # type: ignore[union-attr]
     buf = await message.bot.download_file(file_info.file_path)  # type: ignore[union-attr,arg-type]

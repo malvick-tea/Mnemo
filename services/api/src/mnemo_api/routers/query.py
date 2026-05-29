@@ -6,10 +6,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request
 
+from mnemo_api.config import get_settings
 from mnemo_api.deps import CurrentUser, SessionDep
 from mnemo_api.models import Query
 from mnemo_api.schemas import Citation, QueryFeedbackIn, QueryIn, QueryOut
 from mnemo_api.services.rag import answer_question
+from mnemo_api.services.usage import assert_budget
 
 router = APIRouter(prefix="/v1/query", tags=["query"])
 
@@ -22,6 +24,7 @@ async def query_endpoint(
     request: Request,
 ) -> QueryOut:
     state = request.app.state
+    await assert_budget(state.redis, user.id, get_settings().user_daily_token_cap)
     result = await answer_question(
         session=session,
         qdrant=state.qdrant,
@@ -52,7 +55,7 @@ async def query_endpoint(
     )
 
 
-@router.post("/{query_id}/feedback", status_code=204)
+@router.post("/{query_id}/feedback", status_code=204, response_model=None)
 async def query_feedback(
     query_id: UUID,
     payload: QueryFeedbackIn,

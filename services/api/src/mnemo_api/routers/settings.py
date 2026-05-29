@@ -5,9 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from mnemo_api.deps import CurrentUser, SessionDep
+from mnemo_api.schemas.limits import MAX_CONFIG_BYTES, MAX_CONFIG_KEYS, bounded_mapping
 
 router = APIRouter(prefix="/v1/settings", tags=["settings"])
 
@@ -18,6 +19,13 @@ class SettingsOut(BaseModel):
 
 class SettingsPatch(BaseModel):
     settings: dict[str, Any]
+
+    @field_validator("settings")
+    @classmethod
+    def _bound_settings(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return bounded_mapping(
+            value, what="settings", max_keys=MAX_CONFIG_KEYS, max_bytes=MAX_CONFIG_BYTES
+        )
 
 
 @router.get("", response_model=SettingsOut)

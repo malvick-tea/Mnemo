@@ -11,14 +11,17 @@ user types `/q ...` and stays open for 5 minutes (rolling).
 
 from __future__ import annotations
 
+import time
 from uuid import UUID
 
 from aiogram import F, Router
 from aiogram.filters import Command, CommandObject
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
+from redis.asyncio import Redis
 
 from mnemo_bot.api_client import ApiClient
+from mnemo_bot.handlers.capture_text import capture_note
 from mnemo_bot.keyboards import query_feedback
 from mnemo_bot.logging import get_logger
 from mnemo_bot.states import QueryFlow
@@ -53,6 +56,36 @@ async def query_feedback_cb(cq: CallbackQuery, api: ApiClient, tg_user_id: int) 
     except Exception:
         log.exception("query.feedback.failed", qid=qid_str)
         await cq.answer("Couldn't save feedback.", show_alert=True)
+
+
+@router.message(QueryFlow.in_thread, F.text & ~F.text.startswith("/"))
+async def query_thread_followup(
+    message: Message,
+    state: FSMContext,
+    api: ApiClient,
+    redis: Redis,
+    tg_user_id: int,
+) -> None:
+    """Plain text inside the rolling thread window is a follow-up question.
+
+    The window is rolling: every answer refreshes it. Once it lapses we fall
+    back to Mnemo's default — capture the text as a note — so nothing is lost.
+    """
+    text = (message.text or "").strip()
+    if not text:
+        return
+    data = await state.get_data()
+    started = float(data.get("thread_started_at") or 0.0)
+    if time.time() - started <= _THREAD_TTL_SECONDS:
+        await _ask(message, state, api, tg_user_id, text)
+    else:
+        await state.clear()
+        await capture_note(message, api, redis, tg_user_id, text)
+
+
+@router.callback_query(F.data == "noop")
+async def noop_callback(cq: CallbackQuery) -> None:
+    await cq.answer()
 
 
 @router.callback_query(F.data.startswith("cite:"))
@@ -101,4 +134,4 @@ async def _ask(
     await placeholder.edit_text(body[:4_000], reply_markup=query_feedback(qid, citation_pairs))
 
     await state.set_state(QueryFlow.in_thread)
-    await state.update_data(last_q=q, thread_started_at=tg_user_id)
+    await state.update_data(last_q=q, thread_started_at=time.time())

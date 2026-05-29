@@ -4,12 +4,13 @@ Triggered by the API via Redis enqueue. Pipeline:
     summarize → tag → chunk → embed → upsert Qdrant → publish note.ready
 
 We keep everything in this single actor so a single retry policy applies
-to the whole pipeline. Splitting it into pipelined actors is straightforward
-once we hit performance issues — Dramatiq's `pipe` middleware is wired up.
+to the whole pipeline.
 
-The actor always publishes a ``note.ready.<user_id>`` event in `finally`,
-regardless of outcome, so the bot's "📝 Saving…" placeholder gets edited
-to either the final note view or a "❌ failed" message — never stuck.
+Completion notification is *terminal-only*: the bot's "📝 Saving…" placeholder
+is edited exactly once, when the note reaches `ready` or `failed`. A retriable
+failure re-raises (so Dramatiq retries) **without** publishing — otherwise the
+bot would delete the placeholder mapping on the first failed attempt and a
+later successful retry could never update the user.
 """
 
 from __future__ import annotations
@@ -20,38 +21,47 @@ from uuid import UUID
 import dramatiq
 from mnemo_api.config import get_settings
 from mnemo_api.db import session_factory
+from mnemo_api.exceptions import QuotaExceeded
 from mnemo_api.llm import make_embedder, make_llm
 from mnemo_api.logging import get_logger
 from mnemo_api.models import Chunk, Note, NoteStatus, User
 from mnemo_api.services.chunking import split_into_chunks
 from mnemo_api.services.summarize import summarize
 from mnemo_api.services.tagging import suggest_and_apply_tags
+from mnemo_api.services.usage import assert_budget, current_user_id
 from sqlalchemy import select
 
 from mnemo_workers.qdrant_io import get_qdrant_client, upsert_chunks
 from mnemo_workers.redis_io import get_redis, publish_note_ready
-from mnemo_workers.runner import run
+from mnemo_workers.runner import is_last_attempt, run
 
 log = get_logger(__name__)
 
+_MAX_RETRIES = 3
 
-@dramatiq.actor(queue_name="default", max_retries=3, time_limit=120_000)
+
+@dramatiq.actor(queue_name="default", max_retries=_MAX_RETRIES, time_limit=120_000)
 def process_text_note(note_id: str) -> None:
     run(_process_text_note, UUID(note_id))
 
 
 async def _process_text_note(note_id: UUID) -> None:
     settings = get_settings()
-    llm = make_llm(settings)
-    embedder = make_embedder(settings)
-    qdrant = get_qdrant_client()
+    llm = None
+    embedder = None
+    qdrant = None
     redis = get_redis()
 
     chunk_count = 0
     tg_user_id: int | None = None
     user_id: UUID | None = None
+    terminal = False  # only notify the bot on a terminal (ready/failed) outcome
 
     try:
+        llm = make_llm(settings, redis=redis)
+        embedder = make_embedder(settings)
+        qdrant = get_qdrant_client()
+
         async with session_factory()() as session:
             note = (
                 await session.execute(select(Note).where(Note.id == note_id))
@@ -64,6 +74,7 @@ async def _process_text_note(note_id: UUID) -> None:
             user = await session.get(User, user_id)
             if user is not None:
                 tg_user_id = user.tg_user_id
+            current_user_id.set(user_id)
 
             note.status = NoteStatus.processing.value
             await session.commit()
@@ -73,6 +84,19 @@ async def _process_text_note(note_id: UUID) -> None:
                 note.status = NoteStatus.failed.value
                 note.error_message = "Empty content; nothing to process."
                 await session.commit()
+                terminal = True
+                return
+
+            # Cost guardrail: stop before doing LLM-heavy work if the user is
+            # already at their daily token cap.
+            try:
+                await assert_budget(redis, user_id, settings.user_daily_token_cap)
+            except QuotaExceeded as exc:
+                note.status = NoteStatus.failed.value
+                note.error_message = str(exc)[:1_000]
+                await session.commit()
+                terminal = True
+                log.warning("process_text.over_budget", note_id=str(note_id))
                 return
 
             if note.summary is None:
@@ -128,12 +152,22 @@ async def _process_text_note(note_id: UUID) -> None:
             note.status = NoteStatus.ready.value
             note.processed_at = datetime.now(UTC)
             await session.commit()
+            terminal = True
         log.info("process_text.ok", note_id=str(note_id), chunks=chunk_count)
+    except Exception:
+        # Retriable failure (embed/upsert/db). Re-raise so Dramatiq retries;
+        # do NOT notify — the note stays `processing`. Only once retries are
+        # exhausted do we fail terminally and tell the user.
+        if not is_last_attempt(_MAX_RETRIES):
+            raise
+        log.exception("process_text.exhausted", note_id=str(note_id))
+        await _mark_failed(note_id, "Processing failed after repeated attempts.")
+        terminal = True
+        raise
     finally:
-        # Always notify the bot so the placeholder message gets edited —
-        # whether we end in `ready`, `failed`, or even mid-exception, so
-        # the user never sees a permanently stuck "📝 Saving…" message.
-        if user_id is not None and tg_user_id is not None:
+        # Notify exactly once, on a terminal outcome, so the bot edits the
+        # placeholder to the final note view (or a "failed" message).
+        if terminal and user_id is not None and tg_user_id is not None:
             try:
                 await publish_note_ready(
                     redis,
@@ -148,3 +182,13 @@ async def _process_text_note(note_id: UUID) -> None:
             if callable(close):
                 await close()
         await redis.aclose()
+
+
+async def _mark_failed(note_id: UUID, message: str) -> None:
+    async with session_factory()() as session:
+        note = (await session.execute(select(Note).where(Note.id == note_id))).scalar_one_or_none()
+        if note is None:
+            return
+        note.status = NoteStatus.failed.value
+        note.error_message = message[:2_000]
+        await session.commit()

@@ -20,12 +20,13 @@ from uuid import UUID
 import dramatiq
 from mnemo_api.db import session_factory
 from mnemo_api.logging import get_logger
-from mnemo_api.models import Note, NoteStatus
+from mnemo_api.models import Note, NoteStatus, User
 from mnemo_api.services.queue import enqueue
+from redis.asyncio import Redis
 from sqlalchemy import select
 
 from mnemo_workers.minio_io import download_blob
-from mnemo_workers.redis_io import get_redis
+from mnemo_workers.redis_io import get_redis, publish_note_ready
 from mnemo_workers.runner import run
 
 log = get_logger(__name__)
@@ -57,18 +58,18 @@ async def _process_voice_note(note_id: UUID, blob_key: str) -> None:
             audio_bytes = download_blob(blob_key)
         except Exception as exc:
             log.exception("voice.download.failed", note_id=str(note_id))
-            await _fail(note_id, f"download: {exc}")
+            await _fail(redis, note_id, f"download: {exc}")
             return
 
         try:
             transcript, language, duration = _transcribe(audio_bytes)
         except Exception as exc:
             log.exception("voice.transcribe.failed", note_id=str(note_id))
-            await _fail(note_id, f"transcribe: {exc}")
+            await _fail(redis, note_id, f"transcribe: {exc}")
             return
 
         if not transcript.strip():
-            await _fail(note_id, "Empty transcription (silent or unintelligible audio)")
+            await _fail(redis, note_id, "Empty transcription (silent or unintelligible audio)")
             return
 
         async with session_factory()() as session:
@@ -129,11 +130,22 @@ def _transcribe(audio: bytes) -> tuple[str, str | None, float | None]:
     return text, language, duration
 
 
-async def _fail(note_id: UUID, message: str) -> None:
+async def _fail(redis: Redis, note_id: UUID, message: str) -> None:
+    """Mark the note failed *and* notify the bot so the placeholder updates."""
+    user_id: UUID | None = None
+    tg_user_id: int | None = None
     async with session_factory()() as session:
         note = (await session.execute(select(Note).where(Note.id == note_id))).scalar_one_or_none()
         if note is None:
             return
         note.status = NoteStatus.failed.value
         note.error_message = message[:2_000]
+        user_id = note.user_id
+        user = await session.get(User, note.user_id)
+        tg_user_id = user.tg_user_id if user is not None else None
         await session.commit()
+    if user_id is not None and tg_user_id is not None:
+        try:
+            await publish_note_ready(redis, user_id=user_id, tg_user_id=tg_user_id, note_id=note_id)
+        except Exception:
+            log.exception("voice.fail_notify_failed", note_id=str(note_id))

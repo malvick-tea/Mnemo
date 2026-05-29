@@ -19,12 +19,17 @@ async def healthz() -> dict[str, str]:
 async def readyz(request: Request) -> dict[str, str]:
     state = request.app.state
 
-    # Postgres
+    # Postgres — connectivity *and* schema. A bare `SELECT 1` succeeds against
+    # an empty database, so an install on a fresh volume would report ready
+    # while every application table is missing (migrations not yet applied).
+    # Touching a core table makes readiness fail until `alembic upgrade head`
+    # has run.
     try:
         async with session_factory()() as s:
             await s.execute(text("SELECT 1"))
+            await s.execute(text("SELECT 1 FROM users LIMIT 1"))
     except Exception as exc:
-        raise HTTPException(503, f"postgres unavailable: {exc}") from exc
+        raise HTTPException(503, f"postgres not ready or schema not migrated: {exc}") from exc
 
     # Redis
     try:

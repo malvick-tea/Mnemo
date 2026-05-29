@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _PLACEHOLDER = frozenset({"changeme", ""})
@@ -24,6 +24,7 @@ class Settings(BaseSettings):
 
     allowed_tg_ids: str = Field(default="", alias="MNEMO_ALLOWED_TG_IDS")
     throttle_per_min: int = Field(default=10, alias="MNEMO_THROTTLE_PER_MIN")
+    max_upload_mb: int = Field(default=50, alias="MNEMO_MAX_UPLOAD_MB")
 
     api_base_url: str = Field(default="http://api:8000", alias="MNEMO_API_BASE_URL")
     service_jwt_secret: SecretStr = Field(alias="MNEMO_SERVICE_JWT_SECRET")
@@ -38,6 +39,18 @@ class Settings(BaseSettings):
         if v.get_secret_value().lower() in _PLACEHOLDER:
             raise ValueError("Refusing to start with placeholder secret. Run bootstrap.sh.")
         return v
+
+    @model_validator(mode="after")
+    def _require_whitelist(self) -> Settings:
+        # The whitelist is the only authorization boundary. An empty list used
+        # to mean "allow everyone" (fail-open). Refuse to start in production
+        # so a misconfigured deploy can't accidentally serve the whole world.
+        if self.env == "production" and not self.allowed_tg_ids_set:
+            raise ValueError(
+                "MNEMO_ALLOWED_TG_IDS must list at least one Telegram user ID. "
+                "Refusing to start with an empty whitelist (that would allow everyone)."
+            )
+        return self
 
     @property
     def allowed_tg_ids_set(self) -> frozenset[int]:

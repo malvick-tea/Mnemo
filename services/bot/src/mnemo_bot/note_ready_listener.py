@@ -92,7 +92,9 @@ async def _handle_note_ready(bot: Bot, redis: Redis, api: ApiClient, data: dict[
         log.exception("note_ready.fetch_failed", note_id=note_id_str)
         return
 
+    status = note.get("status")
     text = _format_note(note)
+    edited = False
     try:
         await bot.edit_message_text(
             text=_md_escape(text)[:4_000],
@@ -101,6 +103,7 @@ async def _handle_note_ready(bot: Bot, redis: Redis, api: ApiClient, data: dict[
             reply_markup=note_actions(note_id),
             parse_mode="MarkdownV2",
         )
+        edited = True
     except TelegramBadRequest:
         # Parse error or untouched message — retry plain.
         try:
@@ -111,11 +114,16 @@ async def _handle_note_ready(bot: Bot, redis: Redis, api: ApiClient, data: dict[
                 reply_markup=note_actions(note_id),
                 parse_mode=None,
             )
+            edited = True
         except Exception:
             log.exception("note_ready.edit_failed", note_id=note_id_str)
     except Exception:
         log.exception("note_ready.edit_failed", note_id=note_id_str)
-    finally:
+
+    # Release the placeholder mapping only once the note is terminal and we
+    # actually edited it — so an early/duplicate event can't orphan a note
+    # that a later successful retry still needs to surface.
+    if edited and status in ("ready", "failed"):
         await redis.delete(f"mnemo:msg:{note_id_str}")
 
 

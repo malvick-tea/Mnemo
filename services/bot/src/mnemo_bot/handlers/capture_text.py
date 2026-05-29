@@ -42,7 +42,7 @@ async def save_command(
     if not text.strip():
         await message.reply("Usage: /save your text here")
         return
-    await _capture(message, api, redis, tg_user_id, text)
+    await capture_note(message, api, redis, tg_user_id, text)
 
 
 @router.message(F.text & ~F.text.startswith("/"))
@@ -60,16 +60,17 @@ async def autocapture_text(
     if _URL_RE.fullmatch(text.strip()):
         return
 
-    await _capture(message, api, redis, tg_user_id, text)
+    await capture_note(message, api, redis, tg_user_id, text)
 
 
-async def _capture(
+async def capture_note(
     message: Message,
     api: ApiClient,
     redis: Redis,
     tg_user_id: int,
     text: str,
 ) -> None:
+    """Capture ``text`` as a note and wire up the note-ready placeholder."""
     placeholder = await message.reply("📝 Saving…")
     try:
         result = await api.capture_text(tg_user_id, text)

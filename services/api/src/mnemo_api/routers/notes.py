@@ -11,12 +11,13 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mnemo_api.config import get_settings
-from mnemo_api.deps import CurrentUser, LLMDep, QdrantDep, SessionDep
+from mnemo_api.deps import CurrentUser, LLMDep, QdrantDep, RedisDep, SessionDep
 from mnemo_api.exceptions import MnemoError
 from mnemo_api.logging import get_logger
 from mnemo_api.models import Note, NoteTag, Tag
 from mnemo_api.schemas import AnkiCardOut, AnkiCardsOut, NoteOut, NotePatch, TagOut
 from mnemo_api.services.anki import generate_cards
+from mnemo_api.services.usage import assert_budget
 
 router = APIRouter(prefix="/v1", tags=["notes"])
 log = get_logger(__name__)
@@ -66,7 +67,7 @@ async def patch_note(
     return _to_dto(note, tags)
 
 
-@router.delete("/notes/{note_id}", status_code=204)
+@router.delete("/notes/{note_id}", status_code=204, response_model=None)
 async def delete_note(
     note_id: UUID,
     user: CurrentUser,
@@ -135,7 +136,9 @@ async def generate_anki(
     user: CurrentUser,
     session: SessionDep,
     llm: LLMDep,
+    redis: RedisDep,
 ) -> AnkiCardsOut:
+    await assert_budget(redis, user.id, get_settings().user_daily_token_cap)
     try:
         result = await generate_cards(session, llm, user_id=user.id, note_id=note_id)
     except MnemoError as exc:

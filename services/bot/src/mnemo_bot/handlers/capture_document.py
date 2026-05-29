@@ -13,6 +13,7 @@ from redis.asyncio import Redis
 
 from mnemo_bot.api_client import ApiClient
 from mnemo_bot.logging import get_logger
+from mnemo_bot.uploads import exceeds_limit
 
 log = get_logger(__name__)
 router = Router(name="capture_document")
@@ -38,6 +39,9 @@ async def capture_document(
     mime = doc.mime_type or "application/octet-stream"
     if not _looks_supported(filename, mime):
         await message.reply("❌ Unsupported document type. Send PDF, DOCX, EPUB, Markdown, or TXT.")
+        return
+    if exceeds_limit(doc.file_size):
+        await message.reply("❌ That document is too large.")
         return
 
     placeholder = await message.reply("📄 Parsing the document…")

@@ -67,7 +67,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         minio.make_bucket(settings.minio_bucket)
         log.info("minio.bucket.created", bucket=settings.minio_bucket)
 
-    llm = make_llm(settings)
+    llm = make_llm(settings, redis=redis)
     embedder = make_embedder(settings)
 
     app.state.qdrant = qdrant

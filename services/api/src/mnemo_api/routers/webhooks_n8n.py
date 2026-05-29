@@ -19,8 +19,9 @@ from mnemo_api.db import get_session
 from mnemo_api.exceptions import AuthError
 from mnemo_api.logging import get_logger
 from mnemo_api.metrics import webhook_total
-from mnemo_api.models import IdempotencyKey, Note, NoteStatus
+from mnemo_api.models import IdempotencyKey, Note, NoteStatus, User
 from mnemo_api.schemas import N8NNoteFailedIn, N8NNoteReadyIn
+from mnemo_api.services.events import publish_note_ready
 from mnemo_api.services.queue import enqueue
 
 router = APIRouter(prefix="/v1/webhooks/n8n", tags=["webhooks-n8n"])
@@ -77,7 +78,7 @@ async def n8n_webhook(
                 response = await _handle_note_ready(session, redis, ready)
             elif event == "note-failed":
                 failed = N8NNoteFailedIn.model_validate(payload)
-                response = await _handle_note_failed(session, failed)
+                response = await _handle_note_failed(session, redis, failed)
             else:
                 webhook_total.labels(event=event, outcome="rejected").inc()
                 raise HTTPException(404, f"Unknown event '{event}'")
@@ -128,10 +129,22 @@ async def _handle_note_ready(
 _FAIL_MSG_CAP = 2_000
 
 
-async def _handle_note_failed(session: AsyncSession, payload: N8NNoteFailedIn) -> dict[str, Any]:
+async def _handle_note_failed(
+    session: AsyncSession, redis: Any, payload: N8NNoteFailedIn
+) -> dict[str, Any]:
     note = await session.get(Note, payload.note_id)
     if note is None:
         return {"status": "not_found"}
     note.status = NoteStatus.failed.value
     note.error_message = payload.error_message[:_FAIL_MSG_CAP]
+    # Notify the bot so the user's placeholder doesn't sit "Saving…" forever.
+    user = await session.get(User, note.user_id)
+    await session.flush()
+    if user is not None:
+        try:
+            await publish_note_ready(
+                redis, user_id=note.user_id, tg_user_id=user.tg_user_id, note_id=note.id
+            )
+        except Exception:
+            log.exception("webhook.note_failed.notify_failed", note_id=str(payload.note_id))
     return {"status": "accepted"}

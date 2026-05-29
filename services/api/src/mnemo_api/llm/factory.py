@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from redis.asyncio import Redis
+
 from mnemo_api.config import Settings
 from mnemo_api.exceptions import MnemoError
 from mnemo_api.llm.base import Embedder, LLMClient
@@ -10,17 +12,28 @@ from mnemo_api.llm.openai import OpenAIEmbedder
 from mnemo_api.llm.openrouter import OpenRouterClient
 
 
-def make_llm(settings: Settings) -> LLMClient:
+def make_llm(settings: Settings, *, redis: Redis | None = None) -> LLMClient:
+    """Build the chat client. When ``redis`` is supplied the client is wrapped
+    so every completion's token usage is billed to the per-user daily ledger.
+    """
+    client: LLMClient
     if settings.llm_provider == "openrouter":
         if not settings.openrouter_api_key:
             raise MnemoError("MNEMO_LLM_PROVIDER=openrouter requires OPENROUTER_API_KEY")
-        return OpenRouterClient(
+        client = OpenRouterClient(
             base_url=settings.openrouter_base_url,
             api_key=settings.openrouter_api_key.get_secret_value(),
         )
-    if settings.llm_provider == "ollama":
-        return OllamaClient(base_url=settings.ollama_base_url)
-    raise MnemoError(f"Unknown LLM provider: {settings.llm_provider}")
+    elif settings.llm_provider == "ollama":
+        client = OllamaClient(base_url=settings.ollama_base_url)
+    else:
+        raise MnemoError(f"Unknown LLM provider: {settings.llm_provider}")
+
+    if redis is not None:
+        from mnemo_api.services.usage import MeteringLLM
+
+        return MeteringLLM(client, redis)
+    return client
 
 
 def make_vision_llm(settings: Settings) -> OpenRouterClient:

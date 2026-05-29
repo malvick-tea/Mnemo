@@ -12,6 +12,7 @@ from redis.asyncio import Redis
 
 from mnemo_bot.api_client import ApiClient
 from mnemo_bot.logging import get_logger
+from mnemo_bot.uploads import exceeds_limit
 
 log = get_logger(__name__)
 router = Router(name="capture_photo")
@@ -28,9 +29,13 @@ async def capture_photo(
 ) -> None:
     if not message.photo:
         return
-    placeholder = await message.reply("📷 Reading the image…")
 
     largest = max(message.photo, key=lambda p: p.width * p.height)
+    if exceeds_limit(largest.file_size):
+        await message.reply("❌ That image is too large.")
+        return
+
+    placeholder = await message.reply("📷 Reading the image…")
     file_info = await message.bot.get_file(largest.file_id)  # type: ignore[union-attr]
     buf = await message.bot.download_file(file_info.file_path)  # type: ignore[union-attr,arg-type]
     if buf is None:

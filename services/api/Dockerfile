@@ -27,6 +27,13 @@ RUN uv venv /opt/venv \
  && uv pip install --python /opt/venv/bin/python -e . --no-deps \
  && rm /tmp/requirements.txt
 
+# Run `alembic upgrade head` before the app starts (see entrypoint.sh). The
+# ENTRYPOINT is inherited by both the dev and prod stages; the per-stage CMD
+# supplies the command that actually gets exec'd after migrations.
+COPY entrypoint.sh /usr/local/bin/mnemo-entrypoint
+RUN chmod +x /usr/local/bin/mnemo-entrypoint
+ENTRYPOINT ["/usr/local/bin/mnemo-entrypoint"]
+
 # ── dev image ───────────────────────────────────────────────────────────────
 FROM base AS dev
 RUN uv pip install --python /opt/venv/bin/python ".[dev]"

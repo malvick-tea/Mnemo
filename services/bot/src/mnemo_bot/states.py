@@ -10,3 +10,9 @@ class QueryFlow(StatesGroup):
     context. Stored in Redis-backed FSMContext storage."""
 
     in_thread = State()
+
+
+class NoteEditFlow(StatesGroup):
+    """Waiting for the replacement text after the user taps 📝 Edit on a note."""
+
+    awaiting_text = State()

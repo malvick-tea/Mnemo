@@ -15,6 +15,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from mnemo_api.config import get_settings
 from mnemo_api.deps import CurrentUser, MinioDep, RedisDep, SessionDep
+from mnemo_api.exceptions import ValidationError
 from mnemo_api.metrics import capture_bytes, capture_total
 from mnemo_api.schemas import (
     CaptureForwardIn,
@@ -23,6 +24,7 @@ from mnemo_api.schemas import (
     CaptureURLIn,
 )
 from mnemo_api.services import capture as capture_svc
+from mnemo_api.services.ssrf import assert_public_url
 
 router = APIRouter(prefix="/v1/capture", tags=["capture"])
 
@@ -59,6 +61,12 @@ async def capture_url(
     session: SessionDep,
     redis: RedisDep,
 ) -> CaptureResponse:
+    # SSRF guard: reject internal/private targets before we enqueue a fetch.
+    try:
+        await assert_public_url(str(payload.url))
+    except ValidationError:
+        capture_total.labels(source_type="url", outcome="rejected").inc()
+        raise
     try:
         note = await capture_svc.create_url_note(
             session,
@@ -249,6 +257,12 @@ def _build_blob_key(user_id: UUID, filename: str) -> str:
 
 async def _read_capped(upload: UploadFile, max_mb: int) -> bytes:
     limit = max_mb * 1024 * 1024
+    # Fast path: the multipart parser already knows the part size (spilled to a
+    # spooled temp file, not RAM). Reject oversized uploads *before* pulling the
+    # whole blob into memory with `.read()`.
+    if upload.size is not None and upload.size > limit:
+        raise HTTPException(413, f"Upload exceeds {max_mb} MB limit")
+    # Backstop for when size is unknown: read at most limit+1 bytes.
     body = await upload.read(limit + 1)
     if len(body) > limit:
         raise HTTPException(413, f"Upload exceeds {max_mb} MB limit")

@@ -33,7 +33,13 @@ class AuthMiddleware(BaseMiddleware):
         if tg_id is None:
             return  # ignore events without a user (channel posts, etc.)
 
-        if allowed and tg_id not in allowed:
+        # Fail closed: an empty whitelist denies everyone rather than allowing
+        # everyone. (Production startup also refuses an empty whitelist; this
+        # is the runtime backstop.)
+        if not allowed:
+            log.warning("auth.no_whitelist.deny_all", tg_user_id=tg_id)
+            return
+        if tg_id not in allowed:
             log.warning("auth.rejected", tg_user_id=tg_id)
             return
 

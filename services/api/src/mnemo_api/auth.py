@@ -20,6 +20,8 @@ from mnemo_api.config import get_settings
 from mnemo_api.exceptions import AuthError, WebhookSignatureError
 
 _JWT_ALG = "HS256"
+_JWT_ISSUER = "mnemo-bot"
+_JWT_AUDIENCE = "mnemo-api"
 _REPLAY_WINDOW_SECONDS = 300
 
 
@@ -29,7 +31,8 @@ def make_service_token(tg_user_id: int, *, ttl_seconds: int = 900) -> str:
     now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "sub": str(tg_user_id),
-        "iss": "mnemo-bot",
+        "iss": _JWT_ISSUER,
+        "aud": _JWT_AUDIENCE,
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(seconds=ttl_seconds)).timestamp()),
     }
@@ -37,14 +40,21 @@ def make_service_token(tg_user_id: int, *, ttl_seconds: int = 900) -> str:
 
 
 def verify_service_token(token: str) -> int:
-    """Returns the `tg_user_id`. Raises AuthError on any failure."""
+    """Returns the `tg_user_id`. Raises AuthError on any failure.
+
+    Pins the issuer and audience (and requires them present) so a token
+    minted for some other purpose with the same secret can't be replayed
+    against this API.
+    """
     settings = get_settings()
     try:
         payload = jwt.decode(
             token,
             settings.service_jwt_secret.get_secret_value(),
             algorithms=[_JWT_ALG],
-            options={"require": ["exp", "sub", "iat"]},
+            issuer=_JWT_ISSUER,
+            audience=_JWT_AUDIENCE,
+            options={"require": ["exp", "sub", "iat", "iss", "aud"]},
         )
     except jwt.PyJWTError as exc:
         raise AuthError(f"Invalid service token: {exc}") from exc

@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class TagOut(BaseModel):
@@ -34,11 +34,21 @@ class NoteOut(BaseModel):
 
 
 class NotePatch(BaseModel):
-    title: str | None = None
-    summary: str | None = None
-    processed_content: str | None = None
-    add_tags: list[str] = Field(default_factory=list)
-    remove_tags: list[str] = Field(default_factory=list)
+    title: str | None = Field(default=None, max_length=512)
+    summary: str | None = Field(default=None, max_length=10_000)
+    processed_content: str | None = Field(default=None, max_length=200_000)
+    add_tags: list[str] = Field(default_factory=list, max_length=50)
+    remove_tags: list[str] = Field(default_factory=list, max_length=50)
+
+    @field_validator("add_tags", "remove_tags")
+    @classmethod
+    def _bound_tag_names(cls, value: list[str]) -> list[str]:
+        for tag in value:
+            if not tag.strip():
+                raise ValueError("tag names must be non-empty")
+            if len(tag) > 64:
+                raise ValueError("tag name too long (max 64 chars)")
+        return value
 
 
 class AnkiCardOut(BaseModel):

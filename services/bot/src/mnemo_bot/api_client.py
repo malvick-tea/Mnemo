@@ -25,6 +25,9 @@ from mnemo_bot.logging import correlation_id_ctx, get_logger
 log = get_logger(__name__)
 
 _JWT_ALG = "HS256"
+# Must match the API's verify_service_token (issuer + audience are enforced).
+_JWT_ISSUER = "mnemo-bot"
+_JWT_AUDIENCE = "mnemo-api"
 
 
 def _service_token(tg_user_id: int) -> str:
@@ -32,7 +35,8 @@ def _service_token(tg_user_id: int) -> str:
     now = datetime.now(UTC)
     payload = {
         "sub": str(tg_user_id),
-        "iss": "mnemo-bot",
+        "iss": _JWT_ISSUER,
+        "aud": _JWT_AUDIENCE,
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=15)).timestamp()),
     }
@@ -148,6 +152,12 @@ class ApiClient:
 
     async def get_note(self, tg_user_id: int, note_id: UUID) -> dict[str, Any]:
         return await self._request(tg_user_id, "GET", f"/v1/notes/{note_id}")
+
+    async def update_note(self, tg_user_id: int, note_id: UUID, **fields: Any) -> dict[str, Any]:
+        return await self._request(tg_user_id, "PATCH", f"/v1/notes/{note_id}", json=fields)
+
+    async def delete_note(self, tg_user_id: int, note_id: UUID) -> None:
+        await self._request(tg_user_id, "DELETE", f"/v1/notes/{note_id}")
 
     async def generate_anki(self, tg_user_id: int, note_id: UUID) -> dict[str, Any]:
         return await self._request(tg_user_id, "POST", f"/v1/notes/{note_id}/anki")

@@ -14,6 +14,7 @@ from dramatiq.brokers.redis import RedisBroker
 from dramatiq.middleware import (
     AgeLimit,
     Callbacks,
+    CurrentMessage,
     Middleware,
     Pipelines,
     Retries,
@@ -61,6 +62,10 @@ broker.add_middleware(ShutdownNotifications(notify_shutdown=True))
 broker.add_middleware(Callbacks())
 broker.add_middleware(Pipelines())
 broker.add_middleware(Retries(max_retries=3, min_backoff=1_000, max_backoff=30_000))
+# Exposes the in-flight message to actor bodies via
+# `CurrentMessage.get_current_message()` so they can tell a retriable failure
+# from the final attempt (see `mnemo_workers.runner.is_last_attempt`).
+broker.add_middleware(CurrentMessage())
 broker.add_middleware(MetricsMiddleware())
 
 dramatiq.set_broker(broker)

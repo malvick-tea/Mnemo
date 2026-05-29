@@ -19,10 +19,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mnemo_api.auth import verify_service_token
+from mnemo_api.config import get_settings
 from mnemo_api.db import get_session
 from mnemo_api.exceptions import AuthError, ForbiddenError
 from mnemo_api.llm.base import Embedder, LLMClient
 from mnemo_api.models import User
+from mnemo_api.services.usage import current_user_id
 
 
 async def session_dep() -> AsyncIterator[AsyncSession]:
@@ -45,16 +47,25 @@ async def current_user(
     except AuthError as exc:
         raise HTTPException(401, str(exc)) from exc
 
+    # Defense in depth: don't rely solely on the bot edge. When a whitelist is
+    # configured (the API shares .env with the bot), enforce it here too so a
+    # valid-but-unlisted token can never auto-provision an account.
+    allowed = get_settings().allowed_tg_ids_set
+    if allowed and tg_user_id not in allowed:
+        raise HTTPException(403, "Telegram user not allowed")
+
     result = await session.execute(
         select(User).where(User.tg_user_id == tg_user_id, User.is_active.is_(True))
     )
     user = result.scalar_one_or_none()
     if user is None:
-        # Auto-provision on first contact (single-user, whitelist already
-        # enforced at the bot edge).
+        # Auto-provision on first contact (whitelist already checked above).
         user = User(tg_user_id=tg_user_id)
         session.add(user)
         await session.flush()
+
+    # Attribute downstream LLM token usage to this user (cost guardrail).
+    current_user_id.set(user.id)
     return user
 
 
