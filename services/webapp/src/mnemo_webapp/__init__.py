@@ -6,4 +6,4 @@ duplicating the bot's logic. Authentication is delegated to the reverse
 proxy (Caddy basicauth) per ADR-001's "deploy-time" auth split.
 """
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"

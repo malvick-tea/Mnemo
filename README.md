@@ -24,8 +24,8 @@ cloud LLM provider — and we tell you exactly what crosses the network and when
 ## Quickstart (< 5 min on a clean VPS)
 
 ```bash
-git clone https://github.com/yourname/mnemo.git
-cd mnemo
+git clone https://github.com/malvick-tea/Mnemo.git
+cd Mnemo
 ./scripts/bootstrap.sh
 ```
 
@@ -70,11 +70,14 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full picture.
 
 ## Project status
 
-🚧 **MVP feature-complete (Phase 1-4)** — all capture types (text · URL ·
+✅ **v1.0.0 — production-ready** — all capture types (text · URL ·
 voice · photo · document · forward), hybrid RAG, daily digest cron,
-Notion sync, Obsidian export, Anki card generation, and a read-only
-admin webapp at `/admin/`. Polish items (screenshots, threat model,
-VPS walkthrough) remain. See [PLAN.md](PLAN.md).
+Notion sync, Obsidian export, Anki card generation, a read-only
+admin webapp at `/admin/`, plus production hardening: Prometheus
+metrics, rate limiting, Caddy security headers, threat model.
+Prebuilt images are published to GHCR on every release
+(`ghcr.io/malvick-tea/mnemo-{api,bot,workers,webapp}`).
+See [PLAN.md](PLAN.md) for the full phase log.
 
 ## Documentation
 

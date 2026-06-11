@@ -48,8 +48,8 @@ dig +short mnemo.example.com   # should show your VPS IP
 ## 4. Clone & bootstrap
 
 ```bash
-git clone https://github.com/yourname/mnemo.git
-cd mnemo
+git clone https://github.com/malvick-tea/Mnemo.git
+cd Mnemo
 ./scripts/bootstrap.sh
 ```
 

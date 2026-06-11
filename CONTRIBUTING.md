@@ -18,8 +18,8 @@ self-hoster crowd; we try to keep the PR loop fast.
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Repo
-git clone https://github.com/yourname/mnemo.git
-cd mnemo
+git clone https://github.com/malvick-tea/Mnemo.git
+cd Mnemo
 make dev    # starts the dev compose stack (hot reload, exposed ports)
 ```
 

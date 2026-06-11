@@ -1,6 +1,6 @@
 [project]
 name = "mnemo-bot"
-version = "0.1.0"
+version = "1.0.0"
 description = "Mnemo Telegram bot (aiogram 3)"
 requires-python = ">=3.12"
 license = { text = "MIT" }
